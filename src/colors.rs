@@ -84,6 +84,35 @@ impl ColorRGB {
 }
 
 
+pub fn normalize_chan(x: u8) -> f32 {
+    x as f32 / u8::MAX as f32
+}
+pub fn linearize_chan(x:f32) -> f32 {
+    x.powf(2.2)
+}
+pub fn get_luminance(x: &ColorRGB) -> f32 {
+    let _r = linearize_chan(normalize_chan(x.r));
+    let _g = linearize_chan(normalize_chan(x.g));
+    let _b = linearize_chan(normalize_chan(x.b));
+
+    _r * 0.2126 + _g * 0.7152 + _b * 0.0722
+}
+
+pub fn get_contrast(x: &ColorRGB, y: &ColorRGB) -> f32 {
+    let lx = get_luminance(x);
+    let ly = get_luminance(y);
+
+    if lx < ly {
+        // x luminance is lower, so it is darker
+        (ly- lx) / (ly + 0.1)
+    } else {
+        (lx- ly) / (lx + 0.1)
+    }
+    // https://stackoverflow.com/questions/56198778/what-is-the-efficient-way-to-calculate-human-eye-contrast-difference-for-rgb-val/56200738#56200738   
+}
+
+
+
 pub fn brighten_channel(x: u8, inc: f32) -> u8 {
   let mut inc = inc;
   if inc <= 0. {inc = inc.abs();};

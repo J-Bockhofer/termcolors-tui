@@ -29,6 +29,8 @@ pub enum Action {
   ChangeUndo,
   ChangeRedo,
   ShowShades,
+  PreviousShade,
+  NextShade,
 }
 
 impl<'de> Deserialize<'de> for Action {
@@ -66,6 +68,8 @@ impl<'de> Deserialize<'de> for Action {
           "Undo" => Ok(Action::ChangeUndo),
           "Redo" => Ok(Action::ChangeRedo),
           "Shades" => Ok(Action::ShowShades),
+          "PreviousShade" => Ok(Action::PreviousShade),
+          "NextShade" => Ok(Action::NextShade),
           data if data.starts_with("Error(") => {
             let error_msg = data.trim_start_matches("Error(").trim_end_matches(")");
             Ok(Action::Error(error_msg.to_string()))

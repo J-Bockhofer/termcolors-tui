@@ -1,4 +1,10 @@
 
+pub mod structs;
+use structs::{StatefulList, Animation, StyledLine};
+
+pub mod ui;
+use ui::{create_shades, pad_to_length, create_shade_line, create_shade_lines, create_paragraph_line, create_input_paragraph_line, create_styled_shade_lines};
+
 use std::{collections::HashMap, time::Duration};
 
 use ratatui::widgets::canvas::Shape;
@@ -20,80 +26,11 @@ use std::sync::OnceLock;
 use regex::Regex;
 
 
-use ratatui::widgets::ListState;
-
-
 pub static RGB_REGEX: OnceLock<Regex> = OnceLock::new();
 
-#[derive(Default, Clone)]
-pub struct Animation<T> {
-  pub state: ListState,
-  pub keyframes: Vec<T>,
-}
-
-impl<T> Animation<T> {
-  pub fn with_items(keyframes: Vec<T>) -> Animation<T> {
-      Animation {
-          state: ListState::default(),
-          keyframes,
-      }
-  }
-
-  pub fn next(&mut self) {
-    if self.keyframes.is_empty() {return;}
-      let i = match self.state.selected() {
-          Some(i) => {
-              if i >= self.keyframes.len() - 1 {
-                  0
-              } else {
-                  i + 1
-              }
-          }
-          None => 0,
-      };
-      //println!("next Item: {i}");
-      self.state.select(Some(i));
-  }
-
-  pub fn previous(&mut self) {
-    if self.keyframes.is_empty() {return;}
-      let i = match self.state.selected() {
-          Some(i) => {
-              if i == 0 {
-                  self.keyframes.len() - 1
-              } else {
-                  i - 1
-              }
-          }
-          None => 0,
-      };
-      self.state.select(Some(i));
-  }
-
-}
 
 
-pub fn pad_to_length(input: &str, length: usize) -> String {
-  format!("{:<width$}", input, width = length)
-}
 
-#[derive(Default, Clone, PartialEq, Eq)]
-pub struct InputHEX {
-  pub background: String,
-  pub color_a: String,
-  pub color_b: String,
-  pub color_c: String,
-  pub highlight: String,
-}
-
-#[derive(Default, Clone, PartialEq, Eq)]
-pub struct InputRGB {
-  pub background: String,
-  pub color_a: String,
-  pub color_b: String,
-  pub color_c: String,
-  pub highlight: String,
-}
 
 #[derive(Default, Copy, Clone, PartialEq, Eq)]
 pub enum InputMode {
@@ -234,8 +171,6 @@ pub struct Home {
   input_mode: InputMode,
   input_selector: InputSelector,
   selected_color: ColorRGB,
-  inputs_hex: InputHEX,
-  inputs_rgb: InputRGB,
   color_history: Vec<Colors>,
   redo_history: Vec<Colors>,
 
@@ -246,6 +181,8 @@ pub struct Home {
   marker_type: Marker,
   anim_rect: Animation<DRect>,
   _anim_rect: DRect,
+
+  shade_list: StatefulList<(StyledLine, String)>, // string is shade
 
 }
 
@@ -264,7 +201,8 @@ impl Home {
       DRect{bottom_left:(30.0, 30.0),bottom_right: (70.0, 30.0),top_left: (30.0, 70.0), top_right: (70.0, 70.0), origin: (30.0+20., 30.0+20.)},
       ]);
     this.marker_type = Marker::Braille;
-    this._anim_rect = DRect::new(30.0, 30.0, 40.0, 40.0);
+    this._anim_rect = DRect::new(70.0, 30.0, 40.0, 40.0);
+    this.shade_list = this.create_shade_list();
     this
   }
 
@@ -276,7 +214,8 @@ impl Home {
       InputSelector::B => {self.input_selector = InputSelector::C},
       InputSelector::C => {self.input_selector = InputSelector::Highlight},
       InputSelector::Highlight => {self.input_selector = InputSelector::Background},
-    }    
+    }
+    self.shade_list = self.create_shade_list();  
   }
 
   pub fn previous_color(&mut self) {
@@ -286,7 +225,8 @@ impl Home {
       InputSelector::B => {self.input_selector = InputSelector::A},
       InputSelector::C => {self.input_selector = InputSelector::B},
       InputSelector::Highlight => {self.input_selector = InputSelector::C},
-    }    
+    }
+    self.shade_list = self.create_shade_list(); 
   }
 
   pub fn select_color_by_mode(&mut self) {
@@ -299,7 +239,7 @@ impl Home {
     }
   }
 
-  pub fn get_color_by_mode(&mut self) -> ColorRGB {
+  pub fn get_color_by_mode(&self) -> ColorRGB {
     match self.input_selector {
       InputSelector::Background => {self.colors.background.clone()},
       InputSelector::A => {self.colors.color_a.clone()},
@@ -321,115 +261,14 @@ impl Home {
     colors
   }
 
-  pub fn create_shade_lines(&self, color:&ColorRGB) -> Vec<Line> {
-    vec![
-      Line::from(format!("")),
-      self.create_shade_line(color, -0.9),
-      self.create_shade_line(color, -0.8),
-      self.create_shade_line(color, -0.7),
-      self.create_shade_line(color, -0.6),
-      self.create_shade_line(color, -0.5),
-      self.create_shade_line(color, -0.4),
-      self.create_shade_line(color, -0.3),
-      self.create_shade_line(color, -0.2),
-      self.create_shade_line(color, -0.1),
-      self.create_shade_line(color, 0.0),
-      self.create_shade_line(color, 0.1),
-      self.create_shade_line(color, 0.2),
-      self.create_shade_line(color, 0.3),
-      self.create_shade_line(color, 0.4),
-      self.create_shade_line(color, 0.5),
-      self.create_shade_line(color, 0.6),
-      self.create_shade_line(color, 0.7),
-      self.create_shade_line(color, 0.8),
-      self.create_shade_line(color, 0.9),
-      Line::from(format!("")),
-    ]
-  }
-
-  pub fn create_shade_line(&self, color:&ColorRGB, frac: f32) -> Line {
-    let shade = color.shade(frac);
-    let shade_hex = shade.to_string();
-    let shade_color = ColorRGB::from_hex(&shade_hex);
-    let _rgb: String;
-    if shade_color.is_ok() {
-      let shade_color = shade_color.unwrap();
-      _rgb = pad_to_length(&format!("({},{},{})", shade_color.r, shade_color.g, shade_color.b), 13);
-    }
-    else {
-      _rgb = "".to_string();
-    }
-    Line::from(
-      vec![
-        Span::styled(format!("    {}    ", shade_hex), Style::new().fg(self.colors.background.flip_rgb())),
-        Span::styled(format!("    "), Style::new()),
-        Span::styled(format!("          "), Style::new().bg(shade)),
-        Span::styled(format!("    "), Style::new()),
-        Span::styled(format!("    {}    ", _rgb), Style::new().fg(self.colors.background.flip_rgb())),
-      ]
-    )
-  }
-
-  pub fn create_shades(&self, color:&ColorRGB) -> Vec<Span> {
-    vec![
-      Span::styled(format!(" "), Style::new().bg(color.shade(-0.9))),
-      Span::styled(format!(" "), Style::new().bg(color.shade(-0.8))),
-      Span::styled(format!(" "), Style::new().bg(color.shade(-0.7))),
-      Span::styled(format!(" "), Style::new().bg(color.shade(-0.6))),
-      Span::styled(format!(" "), Style::new().bg(color.shade(-0.5))),
-      Span::styled(format!(" "), Style::new().bg(color.shade(-0.4))),
-      Span::styled(format!(" "), Style::new().bg(color.shade(-0.3))),
-      Span::styled(format!(" "), Style::new().bg(color.shade(-0.2))),
-      Span::styled(format!(" "), Style::new().bg(color.shade(-0.1))),
-      Span::styled(format!(" "), Style::new().bg(color.color)),
-      Span::styled(format!(" "), Style::new().bg(color.shade(0.1))),
-      Span::styled(format!(" "), Style::new().bg(color.shade(0.2))),
-      Span::styled(format!(" "), Style::new().bg(color.shade(0.3))),
-      Span::styled(format!(" "), Style::new().bg(color.shade(0.4))),
-      Span::styled(format!(" "), Style::new().bg(color.shade(0.5))),
-      Span::styled(format!(" "), Style::new().bg(color.shade(0.6))),
-      Span::styled(format!(" "), Style::new().bg(color.shade(0.7))),
-      Span::styled(format!(" "), Style::new().bg(color.shade(0.8))),
-      Span::styled(format!(" "), Style::new().bg(color.shade(0.9))),
-    ]
-  }
-
-  pub fn create_paragraph_line(&self, text: &str, color: &ColorRGB) -> Line {
-    const PADTO: usize = 10;
-    let _text = format!("{}", pad_to_length(text, PADTO));
-    let _rgb = pad_to_length(&format!("({},{},{})", color.r, color.g, color.b), 13);
-    let flip = ColorRGB::from_color(color.flip_rgb()).unwrap();    
-    let mut line = Line::from( vec![
-      Span::styled(format!(" {} ", _text), Style::new().fg(color.color)),
-      Span::styled(format!(" {} ", _text), Style::new().bg(color.color).fg(color.flip_rgb())),
-      Span::styled(        "       ", Style::new()),
-      Span::styled(format!(" {} ", color.color.to_string()), Style::new()),
-      Span::styled(format!(" {} ", _rgb), Style::new()),      
-    ]);
-    line.spans.push(Span::styled(        " Shd:  ", Style::new()),);
-    let shades = self.create_shades(color);
-    for shade in shades {line.spans.push(shade);}
-    line.spans.push(Span::styled(        " Inv:  ", Style::new()));
-    line.spans.push(Span::styled(format!(" {} ", _text), Style::new().fg(flip.color)));
-    line.spans.push(Span::styled(format!(" {} ", _text), Style::new().bg(flip.color).fg(color.color)));
-    line.spans.push(Span::styled(        "       ", Style::new()));
-    line.spans.push(Span::styled(format!(" {} ", flip.color.to_string()), Style::new()));
-    line.spans.push(Span::styled(        " Shd:  ", Style::new()),);
-
-    let shades = self.create_shades(&flip);
-    for shade in shades {line.spans.push(shade);}
-    line
-
-  }
-
   pub fn create_styled_paragraph(&self) -> Paragraph {
     Paragraph::new(
       vec![
-        self.create_paragraph_line("Background", &self.colors.background),
-        self.create_paragraph_line("Lorem", &self.colors.color_a),
-        self.create_paragraph_line("ipsum", &self.colors.color_b),
-        self.create_paragraph_line("doloret", &self.colors.color_c),
-        self.create_paragraph_line("volce", &self.colors.highlight),
+        create_paragraph_line("Background".to_string(), self.colors.background.clone(), self.colors.background.clone()),
+        create_paragraph_line("Lorem".to_string(), self.colors.color_a.clone(), self.colors.background.clone()),
+        create_paragraph_line("ipsum".to_string(), self.colors.color_b.clone(), self.colors.background.clone()),
+        create_paragraph_line("doloret".to_string(), self.colors.color_c.clone(), self.colors.background.clone()),
+        create_paragraph_line("volce".to_string(), self.colors.highlight.clone(), self.colors.background.clone()),
       ]
 
     ).block(
@@ -441,58 +280,33 @@ impl Home {
 
   }
 
-  pub fn create_input_paragraph_line(&self, text: &str, color: &ColorRGB) -> Line {
-    const PADTO: usize = 10;
-
-    let rgb_style = if self.input_mode == InputMode::RGB {Style::new().fg(self.colors.background.color).bg(self.colors.background.flip_rgb())} else {Style::new()};
-    let hex_style = if self.input_mode == InputMode::HEX {Style::new().fg(self.colors.background.color).bg(self.colors.background.flip_rgb())} else {Style::new()};
-
-    let _text = format!("{}", pad_to_length(text, PADTO));
-    let _rgb = pad_to_length(&format!("({},{},{})", color.r, color.g, color.b), 13);
-    let flip = ColorRGB::from_color(color.flip_rgb()).unwrap();    
-    let mut line = Line::from( vec![
-      Span::styled(format!(" {} ", _text), Style::new().fg(color.color)),
-      Span::styled(format!(" {} ", _text), Style::new().bg(color.color).fg(color.flip_rgb())),
-      Span::styled(        "       ", Style::new()),
-      Span::styled(format!(" {} ", color.color.to_string()), hex_style),
-      Span::styled(format!(" {} ", _rgb), rgb_style),      
-    ]);
-    line.spans.push(Span::styled(        " Shd:  ", Style::new()),);
-    let shades = self.create_shades(color);
-    for shade in shades {line.spans.push(shade);}
-    line.spans.push(Span::styled(        " Inv:  ", Style::new()));
-    line.spans.push(Span::styled(format!(" {} ", _text), Style::new().fg(flip.color)));
-    line.spans.push(Span::styled(format!(" {} ", _text), Style::new().bg(flip.color).fg(color.color)));
-    line.spans.push(Span::styled(        "       ", Style::new()));
-    line.spans.push(Span::styled(format!(" {} ", flip.color.to_string()), Style::new()));
-    line.spans.push(Span::styled(        " Shd:  ", Style::new()),);
-
-    let shades = self.create_shades(&flip);
-    for shade in shades {line.spans.push(shade);}
-    line  
 
 
-  }
-
-  pub fn create_input_box(&self, selection: InputSelector, color: &ColorRGB, text:&str) -> Paragraph {
+  pub fn create_input_box(&self, selection: InputSelector, color: ColorRGB, text:String) -> Paragraph {
     let selected = if self.input_selector == selection {true} else {false};
+    let fddhus = text.clone();
 
     Paragraph::new(
       vec![
-        self.create_input_paragraph_line(text, color),
+        create_input_paragraph_line(self.input_mode.clone(), fddhus , color.clone(), self.colors.background.clone()),
       ]
     ).block(
       Block::new()
       .border_style(
-        Style::new().fg(if selected{self.colors.highlight.color} else {self.colors.background.flip_rgb()} ))
+        Style::new().fg(if selected{self.colors.highlight.color.clone()} else {self.colors.background.flip_rgb().clone()} ))
       .borders(Borders::ALL)
-      .bg(self.colors.background.color))
+      .bg(self.colors.background.color.clone()))
 
+  }
+
+  pub fn create_shade_list(&mut self) -> StatefulList<(StyledLine, String)> {
+    let color = self.get_color_by_mode();
+    StatefulList::with_items(create_styled_shade_lines(color, self.colors.background.clone()))
   }
 
   pub fn popup_shades(&mut self) -> impl Widget + '_ {
     let color = self.get_color_by_mode();
-    let lines = self.create_shade_lines(&color);
+    let lines = create_shade_lines(color.clone(), self.colors.background.clone());
     let titlestr = format!(" Shades for {} ", color.color.to_string());
 
     let shadebox = Paragraph::new(lines)
@@ -504,7 +318,6 @@ impl Home {
 
     .title(titlestr));
     shadebox
-
   }
 
   pub fn popup_input_prompt(&mut self) -> impl Widget + '_ {
@@ -556,6 +369,24 @@ impl Home {
       // parse input rgb
       self.parse_rgb();
     }
+  }
+
+  fn submit_shade(&mut self) {
+    if self.display_mode == DisplayMode::Shades {
+      let shd_idx = self.shade_list.state.selected();
+      if shd_idx.is_some() && !self.shade_list.items.is_empty() {
+        let sel_hex = self.shade_list.items[shd_idx.unwrap()].clone().1;
+        if !sel_hex.is_empty() {
+          let shade_col = ColorRGB::from_hex(&sel_hex).unwrap();
+          let colors = self.make_colors_by_mode(shade_col);
+          self.change_color(colors);
+        }
+      }
+    }
+
+
+
+    
   }
 
   fn parse_rgb(&mut self) {
@@ -617,6 +448,7 @@ impl Home {
   fn change_color(&mut self, colors:Colors) {
     self.color_history.push(self.colors.clone());
     self.colors = colors;
+    self.shade_list = self.create_shade_list();
   }
 
   fn undo_change(&mut self) {
@@ -624,6 +456,7 @@ impl Home {
     if last.is_some() {
       self.redo_history.push(self.colors.clone());
       self.colors = last.unwrap();
+      self.shade_list = self.create_shade_list();
     }
   }
 
@@ -632,11 +465,12 @@ impl Home {
     if next.is_some() {
       self.color_history.push(self.colors.clone());
       self.colors = next.unwrap();
+      self.shade_list = self.create_shade_list();
     }
   }
 
 
-  pub fn create_canvas<'a>(&'a mut self, area: &'a Rect) -> impl Widget + '_ { 
+  pub fn create_canvas(&mut self, area: &Rect) -> impl Widget + '_ { 
 /*     let sel_idx = self.anim_rect.state.selected();
     let sel_rect: DRect;
     if sel_idx.is_some() {
@@ -705,7 +539,7 @@ impl Home {
 
 }
 
-impl Component for Home {
+impl Component for Home{
   fn register_action_handler(&mut self, tx: UnboundedSender<Action>) -> Result<()> {
     self.command_tx = Some(tx);
     Ok(())
@@ -791,10 +625,12 @@ impl Component for Home {
       Action::InputHEX => {self.input_mode = InputMode::HEX;},
       Action::InputRGB => {self.input_mode = InputMode::RGB;},
       Action::InputPrompt => {if self.display_mode != DisplayMode::InputPrompt {self.display_mode = DisplayMode::InputPrompt} else {self.display_mode = DisplayMode::Normal};}
-      Action::SubmitInput => {self.submit_input();},
+      Action::SubmitInput => {self.submit_input(); self.submit_shade();},
       Action::ChangeUndo => {self.undo_change();},
-      Action::ChangeRedo => {self.redo_change();}
-      Action::ShowShades => {if self.display_mode != DisplayMode::Shades {self.display_mode = DisplayMode::Shades} else {self.display_mode = DisplayMode::Normal};}
+      Action::ChangeRedo => {self.redo_change();},
+      Action::ShowShades => {if self.display_mode != DisplayMode::Shades {self.display_mode = DisplayMode::Shades} else {self.display_mode = DisplayMode::Normal};},
+      Action::NextShade => {self.shade_list.next();}
+      Action::PreviousShade => {self.shade_list.previous();}
       _ => {},
     }
     Ok(None)
@@ -803,7 +639,7 @@ impl Component for Home {
   fn draw(&mut self, f: &mut Frame<'_>, area: Rect) -> Result<()> {
     let layout = Layout::default()
       .direction(Direction::Vertical)
-      .constraints([Constraint::Percentage(20), Constraint::Percentage(50), Constraint::Percentage(30)])
+      .constraints([Constraint::Percentage(15), Constraint::Percentage(50), Constraint::Percentage(35)])
       .split(f.size());
 
     let input_layout = Layout::default()
@@ -811,11 +647,11 @@ impl Component for Home {
       .constraints([Constraint::Percentage(20),Constraint::Percentage(20),Constraint::Percentage(20),Constraint::Percentage(20),Constraint::Percentage(20),])
       .split(layout[2]);
 
-    f.render_widget(self.create_input_box(InputSelector::Background, &self.colors.background, "Background"), input_layout[0]);
-    f.render_widget(self.create_input_box(InputSelector::A, &self.colors.color_a, "A"), input_layout[1]);
-    f.render_widget(self.create_input_box(InputSelector::B, &self.colors.color_b, "B"), input_layout[2]);
-    f.render_widget(self.create_input_box(InputSelector::C, &self.colors.color_c, "C"), input_layout[3]);
-    f.render_widget(self.create_input_box(InputSelector::Highlight, &self.colors.highlight, "D"), input_layout[4]);
+    f.render_widget(self.create_input_box(InputSelector::Background, self.colors.background.clone(), "Background".to_string()), input_layout[0]);
+    f.render_widget(self.create_input_box(InputSelector::A, self.colors.color_a.clone(), "A".to_string()), input_layout[1]);
+    f.render_widget(self.create_input_box(InputSelector::B, self.colors.color_b.clone(), "B".to_string()), input_layout[2]);
+    f.render_widget(self.create_input_box(InputSelector::C, self.colors.color_c.clone(), "C".to_string()), input_layout[3]);
+    f.render_widget(self.create_input_box(InputSelector::Highlight, self.colors.highlight.clone(), "D".to_string()), input_layout[4]);
 
     f.render_widget(self.create_styled_paragraph().alignment(Alignment::Center), layout[0]);
 
@@ -848,8 +684,32 @@ impl Component for Home {
         f.render_widget(self.popup_input_prompt(), centered_rect(area, 16, 9));
       },
       DisplayMode::Shades => {
-        f.render_widget(Clear, centered_rect(area, 25, 38));
-        f.render_widget(self.popup_shades(), centered_rect(area, 25, 38));
+        let shadelines: Vec<ListItem> = self.shade_list
+        .items
+        .iter()
+        .map(|i| {
+          let mut line: Line = Line::default();
+          for word in i.0.words.clone() {
+            let cspan = Span::styled(word.0, word.1);
+            line.spans.push(cspan);
+          }
+          ListItem::new(line)}).collect();
+          let color = self.get_color_by_mode();
+          let titlestr = format!(" Shades for {} ", color.color.to_string());
+          let shadelist = List::new( shadelines) //home.styledio.clone()
+            .block(Block::default()
+              .bg(self.colors.background.color)
+              .borders(Borders::ALL)
+              .border_style(Style::new().fg(self.colors.background.flip_rgb()))
+              .title(block::Title::from(titlestr).alignment(Alignment::Left))
+            )
+            .highlight_style(Style::new().fg(self.colors.highlight.color))
+            .highlight_symbol(">> ");
+
+
+        f.render_widget(Clear, centered_rect(area, 32, 38));
+        //f.render_widget(self.popup_shades(), centered_rect(area, 32, 38));
+        f.render_stateful_widget(shadelist, centered_rect(area, 32, 38), &mut self.shade_list.state);
       }
     };
 

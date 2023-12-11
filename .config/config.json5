@@ -13,6 +13,8 @@
       "<Ctrl-z>": "Undo", // Undo last change
       "<Ctrl-y>": "Redo", // Redo last Undo
       "<s>": "Shades", // Show Shades for selected
+      "<Up>": "PreviousShade", // Navigate Shades 
+      "<Down>": "NextShade", // Navigate Shades 
     },
   }
 }
