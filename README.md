@@ -26,7 +26,7 @@
 
 ## Screenshot
 
-![Shades](Shades.PNG)
+![Shades](Shades2.PNG)
 
 
 ## Info
