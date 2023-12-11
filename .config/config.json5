@@ -15,6 +15,10 @@
       "<s>": "Shades", // Show Shades for selected
       "<Up>": "PreviousShade", // Navigate Shades 
       "<Down>": "NextShade", // Navigate Shades 
+      "<i>": "InvertColor",
+      "<Shift-i>": "InvertAll",
+
+      //"<g>": "Generate Palette", // Open menu to pick palette and generate 
     },
   }
 }

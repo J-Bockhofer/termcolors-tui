@@ -31,6 +31,9 @@ pub enum Action {
   ShowShades,
   PreviousShade,
   NextShade,
+
+  InvertColor,
+  InvertAll,
 }
 
 impl<'de> Deserialize<'de> for Action {
@@ -70,6 +73,8 @@ impl<'de> Deserialize<'de> for Action {
           "Shades" => Ok(Action::ShowShades),
           "PreviousShade" => Ok(Action::PreviousShade),
           "NextShade" => Ok(Action::NextShade),
+          "InvertColor" => Ok(Action::InvertColor),
+          "InvertAll" => Ok(Action::InvertAll),
           data if data.starts_with("Error(") => {
             let error_msg = data.trim_start_matches("Error(").trim_end_matches(")");
             Ok(Action::Error(error_msg.to_string()))

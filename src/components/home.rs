@@ -1,6 +1,6 @@
 
 pub mod structs;
-use structs::{StatefulList, Animation, StyledLine};
+use structs::{StatefulList, Animation, StyledLine, DCube};
 
 pub mod ui;
 use ui::{create_shades, pad_to_length, create_shade_line, create_shade_lines, create_paragraph_line, create_input_paragraph_line, create_styled_shade_lines};
@@ -100,6 +100,51 @@ impl DRect {
     }    
   }
 
+  pub fn draw_lines(&self, ctx: &mut canvas::Context, colors: &Colors) {
+    // Draw Rect
+    // Bottom Left to Top Left
+    ctx.draw(&canvas::Line {
+        x1: self.bottom_left.0,
+        y1: self.bottom_left.1,
+        x2: self.top_left.0,
+        y2: self.top_left.1,
+        color: colors.color_a.color,
+    });
+    // Top Left to Top Right
+    ctx.draw(&canvas::Line {
+        x1: self.top_left.0,
+        y1: self.top_left.1,
+        x2: self.top_right.0,
+        y2: self.top_right.1,
+        color: colors.color_b.color,
+    });
+    // Top Right to Bottom Right
+    ctx.draw(&canvas::Line {
+        x1: self.top_right.0,
+        y1: self.top_right.1,
+        x2: self.bottom_right.0,
+        y2: self.bottom_right.1,
+        color: colors.color_c.color,
+    });
+    // Bottom Right to Bottom Left
+    ctx.draw(&canvas::Line {
+        x1: self.bottom_right.0,
+        y1: self.bottom_right.1,
+        x2: self.bottom_left.0,
+        y2: self.bottom_left.1,
+        color: colors.highlight.color,
+    });
+    // Bottom Left to Top Right
+    ctx.draw(&canvas::Line {
+        x1: self.bottom_left.0,
+        y1: self.bottom_left.1,
+        x2: self.top_right.0,
+        y2: self.top_right.1,
+        color: colors.highlight.flip_rgb(),
+    });
+  }
+
+
   pub fn fill_rect_with_points(
     &self,
     painter: &mut canvas::Painter,
@@ -181,6 +226,7 @@ pub struct Home {
   marker_type: Marker,
   anim_rect: Animation<DRect>,
   _anim_rect: DRect,
+  _anim_cube: DCube,
 
   shade_list: StatefulList<(StyledLine, String)>, // string is shade
 
@@ -201,7 +247,8 @@ impl Home {
       DRect{bottom_left:(30.0, 30.0),bottom_right: (70.0, 30.0),top_left: (30.0, 70.0), top_right: (70.0, 70.0), origin: (30.0+20., 30.0+20.)},
       ]);
     this.marker_type = Marker::Braille;
-    this._anim_rect = DRect::new(70.0, 30.0, 40.0, 40.0);
+    this._anim_rect = DRect::new(80.0, 30.0, 40.0, 40.0);
+    this._anim_cube = DCube::new(70.0, 30.0, 40.0, 40.0);
     this.shade_list = this.create_shade_list();
     this
   }
@@ -229,7 +276,7 @@ impl Home {
     self.shade_list = self.create_shade_list(); 
   }
 
-  pub fn select_color_by_mode(&mut self) {
+/*   pub fn select_color_by_mode(&mut self) {
     match self.input_selector {
       InputSelector::Background => {self.selected_color = self.colors.background.clone();},
       InputSelector::A => {self.selected_color = self.colors.color_a.clone();},
@@ -237,7 +284,7 @@ impl Home {
       InputSelector::C => {self.selected_color = self.colors.color_c.clone();},
       InputSelector::Highlight => {self.selected_color = self.colors.highlight.clone();},
     }
-  }
+  } */
 
   pub fn get_color_by_mode(&self) -> ColorRGB {
     match self.input_selector {
@@ -259,6 +306,23 @@ impl Home {
       InputSelector::Highlight => {colors.highlight = color;},
     }
     colors
+  }
+
+  pub fn invert_color(&mut self) {
+    let color = self.get_color_by_mode();
+    let color = ColorRGB::from_color(color.flip_rgb()).unwrap();
+    let colors = self.make_colors_by_mode(color);
+    self.change_color(colors);
+  }
+
+  pub fn invert_all(&mut self) {
+    let mut colors = self.colors.clone();
+    colors.background = ColorRGB::from_color(colors.background.flip_rgb()).unwrap();
+    colors.color_a = ColorRGB::from_color(colors.color_a.flip_rgb()).unwrap();
+    colors.color_b = ColorRGB::from_color(colors.color_b.flip_rgb()).unwrap();
+    colors.color_c = ColorRGB::from_color(colors.color_c.flip_rgb()).unwrap();
+    colors.highlight = ColorRGB::from_color(colors.highlight.flip_rgb()).unwrap();
+    self.change_color(colors);
   }
 
   pub fn create_styled_paragraph(&self) -> Paragraph {
@@ -320,6 +384,9 @@ impl Home {
 
   pub fn popup_input_prompt(&mut self) -> impl Widget + '_ {
     
+    let sel_col = self.get_color_by_mode();
+    let isbkg = if self.input_selector == InputSelector::Background {true} else {false};
+
     let mut titlestr = "[ Insert RGB (r,g,b) ]";
     if self.input_mode == InputMode::HEX { titlestr = "[ Insert Hex # ]";};
 
@@ -344,11 +411,21 @@ impl Home {
     .block(Block::default()
     .bg(self.colors.background.color)
     .borders(Borders::ALL)
-    .border_style(Style::new().fg(self.colors.highlight.color))
+    .border_style(Style::new().fg(
+      if isbkg {sel_col.flip_rgb()} else {sel_col.color}
+    ))
     .title(titlestr).title_alignment(Alignment::Center)).alignment(Alignment::Left);
     querybox
 
   }
+
+  pub fn popup_palette(&mut self)  -> impl Widget + '_ {
+    // Palette should be pickable either as a random palette or based on selected color
+    // https://www.thecolorapi.com/docs
+    
+    Paragraph::default()
+  }
+
 
   pub fn add_to_inputstr(&mut self, ch: char) {
     self.inputstr.push(ch);
@@ -367,16 +444,24 @@ impl Home {
       // parse input rgb
       self.parse_rgb();
     }
+
   }
 
   fn submit_shade(&mut self) {
     if self.display_mode == DisplayMode::Shades {
+
       let shd_idx = self.shade_list.state.selected();
+
       if shd_idx.is_some() && !self.shade_list.items.is_empty() {
-        let sel_hex = self.shade_list.items[shd_idx.unwrap()].clone().1;
+
+        let sel_hex: String = self.shade_list.items[shd_idx.unwrap()].clone().1; // this is the hex string
+
         if !sel_hex.is_empty() {
+
           let shade_col = ColorRGB::from_hex(&sel_hex).unwrap();
+
           let colors = self.make_colors_by_mode(shade_col);
+
           self.change_color(colors);
         }
       }
@@ -444,6 +529,7 @@ impl Home {
   }
 
   fn change_color(&mut self, colors:Colors) {
+    self.inputstr = "".to_string();
     self.color_history.push(self.colors.clone());
     self.colors = colors;
     self.shade_list = self.create_shade_list();
@@ -469,64 +555,23 @@ impl Home {
 
 
   pub fn create_canvas(&mut self, area: &Rect) -> impl Widget + '_ { 
-/*     let sel_idx = self.anim_rect.state.selected();
-    let sel_rect: DRect;
-    if sel_idx.is_some() {
-      sel_rect = self.anim_rect.keyframes[sel_idx.unwrap()].clone();
-    } else {
-      sel_rect = DRect::default();
-    } */
+
     let sel_rect = self._anim_rect.rot(15.0);
     self._anim_rect = sel_rect.clone();
     //let sel_rect = sel_rect.clone();
+
+    //self._anim_cube.rotate(15.0, 'z');
+
+    //let _anim_cube = self._anim_cube.clone();
 
     canvas::Canvas::default()
     .background_color(self.colors.background.color)
     .block(Block::default().borders(Borders::ALL).title("").bg(self.colors.background.color).fg(self.colors.background.flip_rgb()))
     .marker(self.marker_type)
     .paint(move |ctx| {
-      
+
       // Draw Rect
-      // Bottom Left to Top Left
-      ctx.draw(&canvas::Line {
-        x1: sel_rect.bottom_left.0,
-        y1: sel_rect.bottom_left.1,
-        x2: sel_rect.top_left.0,
-        y2: sel_rect.top_left.1,
-        color:self.colors.color_a.color,
-      }); 
-      // Top Left to Top Right
-      ctx.draw(&canvas::Line {
-        x1: sel_rect.top_left.0,
-        y1: sel_rect.top_left.1,
-        x2: sel_rect.top_right.0,
-        y2: sel_rect.top_right.1,
-        color:self.colors.color_b.color,
-      }); 
-      // Top Right to Bottom Right
-      ctx.draw(&canvas::Line {
-        x1: sel_rect.top_right.0,
-        y1: sel_rect.top_right.1,
-        x2: sel_rect.bottom_right.0,
-        y2: sel_rect.bottom_right.1,
-        color:self.colors.color_c.color,
-      }); 
-      // Bottom Right to Bottom Left
-      ctx.draw(&canvas::Line {
-        x1: sel_rect.bottom_right.0,
-        y1: sel_rect.bottom_right.1,
-        x2: sel_rect.bottom_left.0,
-        y2: sel_rect.bottom_left.1,
-        color:self.colors.highlight.color,
-      }); 
-      // Bottom Left to Top Right
-      ctx.draw(&canvas::Line {
-        x1: sel_rect.bottom_left.0,
-        y1: sel_rect.bottom_left.1,
-        x2: sel_rect.top_right.0,
-        y2: sel_rect.top_right.1,
-        color:self.colors.highlight.flip_rgb(),
-      }); 
+      sel_rect.draw_lines(ctx, &self.colors);
 
 
     })
@@ -618,8 +663,8 @@ impl Component for Home{
       Action::Render => {
         self.anim_querycursor.next();
         self.anim_rect.next();}
-      Action::NextColor => {self.next_color(); self.select_color_by_mode();},
-      Action::PreviousColor => {self.previous_color(); self.select_color_by_mode();},
+      Action::NextColor => {self.next_color(); }, // self.select_color_by_mode();
+      Action::PreviousColor => {self.previous_color();}, // self.select_color_by_mode();
       Action::InputHEX => {self.input_mode = InputMode::HEX;},
       Action::InputRGB => {self.input_mode = InputMode::RGB;},
       Action::InputPrompt => {if self.display_mode != DisplayMode::InputPrompt {self.display_mode = DisplayMode::InputPrompt} else {self.display_mode = DisplayMode::Normal};}
@@ -629,6 +674,8 @@ impl Component for Home{
       Action::ShowShades => {if self.display_mode != DisplayMode::Shades {self.display_mode = DisplayMode::Shades} else {self.display_mode = DisplayMode::Normal};},
       Action::NextShade => {self.shade_list.next();}
       Action::PreviousShade => {self.shade_list.previous();}
+      Action::InvertColor => {self.invert_color();}
+      Action::InvertAll => {self.invert_all();}
       _ => {},
     }
     Ok(None)
@@ -657,8 +704,13 @@ impl Component for Home{
 
     let canvaslayout = Layout::default()
     .direction(Direction::Horizontal)
-    .constraints([Constraint::Percentage(10), Constraint::Percentage(20), Constraint::Percentage(70)])
+    .constraints([Constraint::Percentage(10), Constraint::Percentage(20), Constraint::Percentage(2),  Constraint::Percentage(36), Constraint::Percentage(32)])
     .split(layout[1]);
+
+    let popuplayout = Layout::default()
+    .direction(Direction::Vertical)
+    .constraints([Constraint::Percentage(10), Constraint::Percentage(80), Constraint::Percentage(10)])
+    .split(canvaslayout[3]);
 
     let div = Layout::default()
     .direction(Direction::Vertical)
@@ -675,11 +727,15 @@ impl Component for Home{
     f.render_widget(Paragraph::new("").bg(self.colors.color_c.color), blocklayout[5]);
     f.render_widget(Paragraph::new("").bg(self.colors.highlight.color), blocklayout[7]);
 
+
+
+
     match self.display_mode {
       DisplayMode::Normal => {},
       DisplayMode::InputPrompt =>{
-        f.render_widget(Clear, centered_rect(area, 16, 9));
-        f.render_widget(self.popup_input_prompt(), centered_rect(area, 16, 9));
+        let centered = centered_rect(popuplayout[1], 50, 30);
+        f.render_widget(Clear, centered);
+        f.render_widget(self.popup_input_prompt(), centered);
       },
       DisplayMode::Shades => {
         let shadelines: Vec<ListItem> = self.shade_list
@@ -693,21 +749,30 @@ impl Component for Home{
           }
           ListItem::new(line)}).collect();
           let color = self.get_color_by_mode();
+          let isbkg = if self.input_selector == InputSelector::Background {true} else {false};
           let titlestr = format!(" Shades for {} ", color.color.to_string());
           let shadelist = List::new( shadelines) //home.styledio.clone()
             .block(Block::default()
               .bg(self.colors.background.color)
               .borders(Borders::ALL)
-              .border_style(Style::new().fg(self.colors.background.flip_rgb()))
+              .border_style(Style::new().fg(
+                if isbkg {
+                  color.flip_rgb()
+                } else {
+                  color.color
+                }
+              ))
               .title(block::Title::from(titlestr).alignment(Alignment::Left))
             )
             .highlight_style(Style::new().fg(self.colors.highlight.color))
             .highlight_symbol(">> ");
 
 
-        f.render_widget(Clear, centered_rect(area, 32, 38));
+        //f.render_widget(Clear, centered_rect(area, 32, 38));
         //f.render_widget(self.popup_shades(), centered_rect(area, 32, 38));
-        f.render_stateful_widget(shadelist, centered_rect(area, 32, 38), &mut self.shade_list.state);
+        //f.render_stateful_widget(shadelist, centered_rect(area, 32, 38), &mut self.shade_list.state);
+        f.render_widget(Clear, popuplayout[1]);
+        f.render_stateful_widget(shadelist, popuplayout[1], &mut self.shade_list.state);
       }
     };
 

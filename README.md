@@ -19,9 +19,12 @@
 
 ## Future plans
 
-1. Saving of color palettes in a file [ ]
-2. Selection of colors via shades     [✓]
-3. More related colors                [ ] 
+1. Saving of color palettes in a file   [ ]
+2. Selection of colors via shades       [✓]
+3. Palette generation                   [ ]
+4. HSL sliders                          [ ]
+5. Paste from clipboard w/o mouse       [ ]
+6. Default palette in config            [ ]
 
 
 ## Screenshot

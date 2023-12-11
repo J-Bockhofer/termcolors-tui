@@ -30,7 +30,6 @@ vec![
 ]
 }
 
-
 pub fn create_shade_line(color:ColorRGB, frac: f32, bkgcolor:ColorRGB,) -> Line<'static> {
     let shade = color.shade(frac);
     let shade_hex = shade.to_string();
@@ -56,8 +55,7 @@ pub fn create_shade_line(color:ColorRGB, frac: f32, bkgcolor:ColorRGB,) -> Line<
     )
   }
 
-
-  pub fn create_shade_lines(color:ColorRGB, bkgcolor:ColorRGB) -> Vec<Line<'static>> {
+pub fn create_shade_lines(color:ColorRGB, bkgcolor:ColorRGB) -> Vec<Line<'static>> {
     vec![
       Line::from(format!("")),
       create_shade_line(color.clone(), -0.9, bkgcolor.clone()),
@@ -83,8 +81,7 @@ pub fn create_shade_line(color:ColorRGB, frac: f32, bkgcolor:ColorRGB,) -> Line<
     ]
   }
 
-
-  pub fn create_styled_shade_line(color:ColorRGB, frac: f32, bkgcolor:ColorRGB) -> (StyledLine, String) {
+pub fn create_styled_shade_line(color:ColorRGB, frac: f32, bkgcolor:ColorRGB) -> (StyledLine, String) {
     let shade = color.shade(frac);
     let shade_hex = shade.to_string();
     let shade_color = ColorRGB::from_hex(&shade_hex);
@@ -109,7 +106,7 @@ pub fn create_shade_line(color:ColorRGB, frac: f32, bkgcolor:ColorRGB,) -> Line<
     (res, shade.to_string())
   }
 
-  pub fn create_styled_shade_lines(color:ColorRGB, bkgcolor:ColorRGB) -> Vec<(StyledLine, String)> {
+pub fn create_styled_shade_lines(color:ColorRGB, bkgcolor:ColorRGB) -> Vec<(StyledLine, String)> {
     vec![
         (StyledLine{words: vec![(String::from(""), Style::default())]}, "".to_string()),
       create_styled_shade_line(color.clone(), -0.9, bkgcolor.clone()),
@@ -135,9 +132,7 @@ pub fn create_shade_line(color:ColorRGB, frac: f32, bkgcolor:ColorRGB,) -> Line<
     ]
   }
 
-
-
-  pub fn create_paragraph_line(text: String, color: ColorRGB, bkgcolor: ColorRGB) -> Line<'static> {
+pub fn create_paragraph_line(text: String, color: ColorRGB, bkgcolor: ColorRGB) -> Line<'static> {
     const PADTO: usize = 10;
     let _text = format!("{}", pad_to_length(text, PADTO));
     let _rgb = pad_to_length(format!("({},{},{})", color.r, color.g, color.b), 13);
@@ -165,8 +160,7 @@ pub fn create_shade_line(color:ColorRGB, frac: f32, bkgcolor:ColorRGB,) -> Line<
 
   }
 
-
-  pub fn create_input_paragraph_line(input_mode: InputMode, text: String, color: ColorRGB, bkgcolor: ColorRGB) -> Line<'static> {
+pub fn create_input_paragraph_line(input_mode: InputMode, text: String, color: ColorRGB, bkgcolor: ColorRGB) -> Line<'static> {
     const PADTO: usize = 10;
 
     let rgb_style = if input_mode == InputMode::RGB {Style::new().fg(bkgcolor.color).bg(bkgcolor.flip_rgb())} else {Style::new().fg(bkgcolor.flip_rgb())};
