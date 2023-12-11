@@ -14,11 +14,13 @@
 
 7. Hotkeys are fully configurable via a config file.
 
+8. `Clone` and `cargo run`
+
 
 ## Future plans
 
 1. Saving of color palettes in a file [ ]
-2. Selection of colors via shades     [ ]
+2. Selection of colors via shades     [✓]
 3. More related colors                [ ] 
 
 

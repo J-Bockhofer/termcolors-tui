@@ -280,8 +280,6 @@ impl Home {
 
   }
 
-
-
   pub fn create_input_box(&self, selection: InputSelector, color: ColorRGB, text:String) -> Paragraph {
     let selected = if self.input_selector == selection {true} else {false};
     let fddhus = text.clone();
