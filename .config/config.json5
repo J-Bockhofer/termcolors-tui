@@ -1,0 +1,18 @@
+{
+  "keybindings": {
+    "Home": {
+      "<Esc>": "Quit", // Quit the application
+      "<Ctrl-d>": "Quit", // Another way to quit
+      "<Ctrl-c>": "Quit", // Yet another way to quit
+      "<Tab>": "NextColor", // Switch Input to next color 
+      "<BackTab>": "PreviousColor", // Switch Input to previous color 
+      "<Left>": "InputHEX", // Switch Input to HEX 
+      "<Right>": "InputRGB", // Switch Input to RGB
+      "<q>": "Input", // Open the input prompt
+      "<Enter>": "SubmitInput", // Submit your input 
+      "<Ctrl-z>": "Undo", // Undo last change
+      "<Ctrl-y>": "Redo", // Redo last Undo
+      "<s>": "Shades", // Show Shades for selected
+    },
+  }
+}
