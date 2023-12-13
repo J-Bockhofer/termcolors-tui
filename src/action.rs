@@ -34,6 +34,15 @@ pub enum Action {
 
   InvertColor,
   InvertAll,
+
+  SwitchMarker,
+  ToggleSpin,
+
+  ToggleHSV,
+  HSVPrev,
+  HSVNext,
+  HSVIncrease,
+  HSVDecrease,
 }
 
 impl<'de> Deserialize<'de> for Action {
@@ -75,6 +84,13 @@ impl<'de> Deserialize<'de> for Action {
           "NextShade" => Ok(Action::NextShade),
           "InvertColor" => Ok(Action::InvertColor),
           "InvertAll" => Ok(Action::InvertAll),
+          "SwitchMarker" => Ok(Action::SwitchMarker),
+          "ToggleSpin" => Ok(Action::ToggleSpin),
+          "HSV" => Ok(Action::ToggleHSV),
+          "HSVPrev" => Ok(Action::HSVPrev),
+          "HSVNext" => Ok(Action::HSVNext),
+          "HSVDecrease" => Ok(Action::HSVDecrease),
+          "HSVIncrease" => Ok(Action::HSVIncrease),
           data if data.starts_with("Error(") => {
             let error_msg = data.trim_start_matches("Error(").trim_end_matches(")");
             Ok(Action::Error(error_msg.to_string()))

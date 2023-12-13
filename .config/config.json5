@@ -4,21 +4,35 @@
       "<Esc>": "Quit", // Quit the application
       "<Ctrl-d>": "Quit", // Another way to quit
       "<Ctrl-c>": "Quit", // Yet another way to quit
+
       "<Tab>": "NextColor", // Switch Input to next color 
       "<BackTab>": "PreviousColor", // Switch Input to previous color 
+
       "<Left>": "InputHEX", // Switch Input to HEX 
       "<Right>": "InputRGB", // Switch Input to RGB
       "<q>": "Input", // Open the input prompt
-      "<Enter>": "SubmitInput", // Submit your input 
+
+      "<Enter>": "SubmitInput", // Submit your input in query, shade and HSV
+
       "<Ctrl-z>": "Undo", // Undo last change
       "<Ctrl-y>": "Redo", // Redo last Undo
+
       "<s>": "Shades", // Show Shades for selected
       "<Up>": "PreviousShade", // Navigate Shades 
       "<Down>": "NextShade", // Navigate Shades 
-      "<i>": "InvertColor",
-      "<Shift-i>": "InvertAll",
 
-      //"<g>": "Generate Palette", // Open menu to pick palette and generate 
+      "<i>": "InvertColor", // Inverts the selected color
+      "<Shift-i>": "InvertAll", // Inverts all colors
+
+      "<y>": "HSV", // shows HSV input for selected color
+      "<h>": "HSVPrev", // Switch between H, S and V input
+      "<l>": "HSVNext", // Switch between H, S and V input
+      "<j>": "HSVIncrease", // Switch between H, S and V input
+      "<k>": "HSVDecrease", // Switch between H, S and V input
+
+      "<m>": "SwitchMarker", // Switches the marker type between Bar, Block, Braille, Dot and HalfBlock (default Braille)
+      "<n>": "ToggleSpin", // spins the rectangle if turned on 
+
     },
   }
 }

@@ -1,35 +1,40 @@
+pub mod hsv;
+
 
 use ratatui::{prelude::*, widgets::*};
-use super::{ColorRGB, InputMode, StyledLine};
+use super::{ColorRGB, InputMode, StyledLine, get_contrast};
 
 pub fn pad_to_length(input: String, length: usize) -> String {
     format!("{:<width$}", input, width = length)
 }
-  
-pub fn create_shades(color:ColorRGB) -> Vec<Span<'static>> {
-vec![
-    Span::styled(format!(" "), Style::new().bg(color.shade(-0.9))),
-    Span::styled(format!(" "), Style::new().bg(color.shade(-0.8))),
-    Span::styled(format!(" "), Style::new().bg(color.shade(-0.7))),
-    Span::styled(format!(" "), Style::new().bg(color.shade(-0.6))),
-    Span::styled(format!(" "), Style::new().bg(color.shade(-0.5))),
-    Span::styled(format!(" "), Style::new().bg(color.shade(-0.4))),
-    Span::styled(format!(" "), Style::new().bg(color.shade(-0.3))),
-    Span::styled(format!(" "), Style::new().bg(color.shade(-0.2))),
-    Span::styled(format!(" "), Style::new().bg(color.shade(-0.1))),
-    Span::styled(format!(" "), Style::new().bg(color.color)),
-    Span::styled(format!(" "), Style::new().bg(color.shade(0.1))),
-    Span::styled(format!(" "), Style::new().bg(color.shade(0.2))),
-    Span::styled(format!(" "), Style::new().bg(color.shade(0.3))),
-    Span::styled(format!(" "), Style::new().bg(color.shade(0.4))),
-    Span::styled(format!(" "), Style::new().bg(color.shade(0.5))),
-    Span::styled(format!(" "), Style::new().bg(color.shade(0.6))),
-    Span::styled(format!(" "), Style::new().bg(color.shade(0.7))),
-    Span::styled(format!(" "), Style::new().bg(color.shade(0.8))),
-    Span::styled(format!(" "), Style::new().bg(color.shade(0.9))),
-]
+pub fn leftpad_to_length(input: String, length: usize) -> String {
+  format!("{:>width$}", input, width = length)
 }
 
+pub fn create_shades(color:ColorRGB) -> Vec<Span<'static>> {
+  vec![
+      Span::styled(format!(" "), Style::new().bg(color.shade(-0.9))),
+      Span::styled(format!(" "), Style::new().bg(color.shade(-0.8))),
+      Span::styled(format!(" "), Style::new().bg(color.shade(-0.7))),
+      Span::styled(format!(" "), Style::new().bg(color.shade(-0.6))),
+      Span::styled(format!(" "), Style::new().bg(color.shade(-0.5))),
+      Span::styled(format!(" "), Style::new().bg(color.shade(-0.4))),
+      Span::styled(format!(" "), Style::new().bg(color.shade(-0.3))),
+      Span::styled(format!(" "), Style::new().bg(color.shade(-0.2))),
+      Span::styled(format!(" "), Style::new().bg(color.shade(-0.1))),
+      Span::styled(format!(" "), Style::new().bg(color.color)),
+      Span::styled(format!(" "), Style::new().bg(color.shade(0.1))),
+      Span::styled(format!(" "), Style::new().bg(color.shade(0.2))),
+      Span::styled(format!(" "), Style::new().bg(color.shade(0.3))),
+      Span::styled(format!(" "), Style::new().bg(color.shade(0.4))),
+      Span::styled(format!(" "), Style::new().bg(color.shade(0.5))),
+      Span::styled(format!(" "), Style::new().bg(color.shade(0.6))),
+      Span::styled(format!(" "), Style::new().bg(color.shade(0.7))),
+      Span::styled(format!(" "), Style::new().bg(color.shade(0.8))),
+      Span::styled(format!(" "), Style::new().bg(color.shade(0.9))),
+  ]
+  }
+  
 pub fn create_shade_line(color:ColorRGB, frac: f32, bkgcolor:ColorRGB,) -> Line<'static> {
     let shade = color.shade(frac);
     let shade_hex = shade.to_string();
@@ -54,7 +59,7 @@ pub fn create_shade_line(color:ColorRGB, frac: f32, bkgcolor:ColorRGB,) -> Line<
       ]
     )
   }
-
+  
 pub fn create_shade_lines(color:ColorRGB, bkgcolor:ColorRGB) -> Vec<Line<'static>> {
     vec![
       Line::from(format!("")),
@@ -86,11 +91,14 @@ pub fn create_styled_shade_line(color:ColorRGB, frac: f32, bkgcolor:ColorRGB) ->
     let shade_hex = shade.to_string();
     let shade_color = ColorRGB::from_hex(&shade_hex);
     let _rgb: String;
+    let contrast: f32;
     if shade_color.is_ok() {
       let shade_color = shade_color.unwrap();
+      contrast = get_contrast(&shade_color, &bkgcolor);
       _rgb = pad_to_length(format!("({},{},{})", shade_color.r, shade_color.g, shade_color.b), 13);
     }
     else {
+      contrast = 0.0;
       _rgb = "".to_string();
     }
     let mut res = StyledLine::default();
@@ -101,7 +109,8 @@ pub fn create_styled_shade_line(color:ColorRGB, frac: f32, bkgcolor:ColorRGB) ->
         (format!("    "), Style::new()),
         (format!("    {}    ", _rgb), Style::new().fg(bkgcolor.flip_rgb())),
         (format!("    "), Style::new()),
-        (format!(" Lorem ipsum "), Style::new().fg(shade))
+        (format!(" Lorem ipsum "), Style::new().fg(shade)),
+        (format!("  {:.2}  ", contrast), Style::new().fg(bkgcolor.flip_rgb())),
     ];
     (res, shade.to_string())
   }
@@ -144,16 +153,30 @@ pub fn create_paragraph_line(text: String, color: ColorRGB, bkgcolor: ColorRGB) 
       Span::styled(format!(" {} ", color.color.to_string()), Style::new().fg(bkgcolor.flip_rgb())),
       Span::styled(format!(" {} ", _rgb), Style::new().fg(bkgcolor.flip_rgb())),      
     ]);
-    line.spans.push(Span::styled(        " Shd:  ", Style::new().fg(bkgcolor.flip_rgb())),);
+    line.spans.push(Span::styled(format!(" Ctr: {:.2} ", get_contrast(&color, &bkgcolor)), Style::new().fg(bkgcolor.flip_rgb())));
+    let _hsv = color.rgb_to_hsv();
+    let h = pad_to_length(format!("{:.0}", _hsv.0), 4);
+    let s = pad_to_length(format!("{:.2}", _hsv.1), 4);
+    let v = pad_to_length(format!("{:.2}", _hsv.2), 4 );
+    let _hsv = pad_to_length(format!(" HSV: {} {} {} ", h, s, v),20);
+    line.spans.push(Span::styled(_hsv, Style::new().fg(bkgcolor.flip_rgb())));
+    line.spans.push(Span::styled(        " Shd:  ", Style::new().fg(bkgcolor.flip_rgb())));
     let shades = create_shades(color.clone());
     for shade in shades {line.spans.push(shade);}
+
     line.spans.push(Span::styled(        " Inv:  ", Style::new().fg(bkgcolor.flip_rgb())));
     line.spans.push(Span::styled(format!(" {} ", _text), Style::new().fg(flip.color)));
     line.spans.push(Span::styled(format!(" {} ", _text), Style::new().bg(flip.color).fg(color.color)));
     line.spans.push(Span::styled(        "       ", Style::new()));
     line.spans.push(Span::styled(format!(" {} ", flip.color.to_string()), Style::new().fg(bkgcolor.flip_rgb())));
-    line.spans.push(Span::styled(        " Shd:  ", Style::new().fg(bkgcolor.flip_rgb())),);
-
+    line.spans.push(Span::styled(format!(" Ctr: {:.2} ", get_contrast(&flip, &bkgcolor)), Style::new().fg(bkgcolor.flip_rgb())));
+    let _hsv = flip.rgb_to_hsv();
+    let h = leftpad_to_length(format!("{:.0}", _hsv.0), 4);
+    let s = pad_to_length(format!("{:.2}", _hsv.1), 4);
+    let v = pad_to_length(format!("{:.2}", _hsv.2), 4);
+    let _hsv = pad_to_length(format!(" HSV: {} {} {} ", h, s, v),20);
+    line.spans.push(Span::styled(_hsv, Style::new().fg(bkgcolor.flip_rgb())));
+    line.spans.push(Span::styled(        " Shd:  ", Style::new().fg(bkgcolor.flip_rgb())));
     let shades = create_shades(flip);
     for shade in shades {line.spans.push(shade);}
     line
@@ -191,3 +214,4 @@ pub fn create_input_paragraph_line(input_mode: InputMode, text: String, color: C
     line  
 
   }
+

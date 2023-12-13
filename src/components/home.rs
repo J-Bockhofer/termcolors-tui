@@ -4,6 +4,10 @@ use structs::{StatefulList, Animation, StyledLine, DCube};
 
 pub mod ui;
 use ui::{create_shades, pad_to_length, create_shade_line, create_shade_lines, create_paragraph_line, create_input_paragraph_line, create_styled_shade_lines};
+use ui::hsv;
+
+pub mod drect;
+use drect::DRect;
 
 use std::{collections::HashMap, time::Duration};
 
@@ -19,7 +23,7 @@ use super::{Component, Frame};
 use crate::{
   action::Action,
   config::{Config, KeyBindings},
-  colors::{Colors, ColorRGB},
+  colors::{Colors, ColorRGB, get_contrast},
 };
 
 use std::sync::OnceLock;
@@ -29,7 +33,13 @@ use regex::Regex;
 pub static RGB_REGEX: OnceLock<Regex> = OnceLock::new();
 
 
-
+#[derive(Default, Copy, Clone, PartialEq, Eq)]
+pub enum HSVMode {
+  H,
+  #[default]
+  S,
+  V,
+}
 
 
 #[derive(Default, Copy, Clone, PartialEq, Eq)]
@@ -55,156 +65,8 @@ pub enum DisplayMode {
   Normal,
   InputPrompt,
   Shades,
+  HSV,
 }
-
-#[derive(Default, Clone)]
-pub struct DRect {
-  bottom_left: (f64, f64),
-  bottom_right: (f64, f64),
-  top_left: (f64, f64),
-  top_right: (f64, f64),
-  origin: (f64, f64),
-}
-
-impl DRect {
-  pub fn new(x: f64, y: f64, w:f64, h:f64) -> Self
-  {
-    DRect{
-      bottom_left: (x, y),
-      bottom_right: (x+w, y),
-      top_left: (x, y+h),
-      top_right: (x+w, y+h),
-      origin: (x+w/2., y+h/2.),
-    }
-  }
-
-  pub fn rot(&self, ang: f64) -> Self {
-    let (cos_ang, sin_ang) = ang.cos_sin();
-
-    let rotate_point = |(px, py): (f64, f64)| {
-        let px_rel = px - self.origin.0;
-        let py_rel = py - self.origin.1;
-
-        let new_px_rel = cos_ang * px_rel - sin_ang * py_rel;
-        let new_py_rel = sin_ang * px_rel + cos_ang * py_rel;
-
-        (self.origin.0 + new_px_rel, self.origin.1 + new_py_rel)
-    };
-
-    DRect {
-        bottom_left: rotate_point(self.bottom_left),
-        bottom_right: rotate_point(self.bottom_right),
-        top_left: rotate_point(self.top_left),
-        top_right: rotate_point(self.top_right),
-        origin: self.origin,
-    }    
-  }
-
-  pub fn draw_lines(&self, ctx: &mut canvas::Context, colors: &Colors) {
-    // Draw Rect
-    // Bottom Left to Top Left
-    ctx.draw(&canvas::Line {
-        x1: self.bottom_left.0,
-        y1: self.bottom_left.1,
-        x2: self.top_left.0,
-        y2: self.top_left.1,
-        color: colors.color_a.color,
-    });
-    // Top Left to Top Right
-    ctx.draw(&canvas::Line {
-        x1: self.top_left.0,
-        y1: self.top_left.1,
-        x2: self.top_right.0,
-        y2: self.top_right.1,
-        color: colors.color_b.color,
-    });
-    // Top Right to Bottom Right
-    ctx.draw(&canvas::Line {
-        x1: self.top_right.0,
-        y1: self.top_right.1,
-        x2: self.bottom_right.0,
-        y2: self.bottom_right.1,
-        color: colors.color_c.color,
-    });
-    // Bottom Right to Bottom Left
-    ctx.draw(&canvas::Line {
-        x1: self.bottom_right.0,
-        y1: self.bottom_right.1,
-        x2: self.bottom_left.0,
-        y2: self.bottom_left.1,
-        color: colors.highlight.color,
-    });
-    // Bottom Left to Top Right
-    ctx.draw(&canvas::Line {
-        x1: self.bottom_left.0,
-        y1: self.bottom_left.1,
-        x2: self.top_right.0,
-        y2: self.top_right.1,
-        color: colors.highlight.flip_rgb(),
-    });
-  }
-
-
-  pub fn fill_rect_with_points(
-    &self,
-    painter: &mut canvas::Painter,
-    rect: &Rect,
-    color: Color,
-    ) {
-    for y in rect.y..rect.y + rect.height {
-        for x in rect.x..rect.x + rect.width {
-            // Map the x, y coordinates within the Rect to the DRect
-            let mapped_point = self.map_rect_to_drect(x, y, rect.width, rect.height);
-
-            // Paint the point with the specified color and marker type
-            painter.paint(mapped_point.0 as usize, mapped_point.1 as usize, color);
-        }
-    }
-  }
-  pub fn fill_rect_with_points_dumb(
-    &self,
-    painter: &mut canvas::Painter,
-    rect: &Rect,
-    color: Color,
-    increment: f64,
-  ) {
-    let mut x = self.bottom_left.0;
-    let mut y = self.bottom_left.1;
-
-    while x <= self.bottom_right.0 && x <= rect.width as f64 {
-        while y <= self.top_left.1 && y <= rect.height as f64 {
-            painter.paint(x as usize, y as usize, color);
-            y += increment;
-        }
-        x += increment;
-        y = self.bottom_left.1;
-    }
-  }
-
-
-/// Does not work correctly, but looks fun
-fn map_rect_to_drect(&self, x: u16, y: u16, width: u16, height: u16) -> (f64, f64) {
-    // Map x, y to coordinates within the DRect
-    let mapped_x = self.bottom_left.0
-        + (x as f64 / width as f64) * (self.bottom_right.0 - self.bottom_left.0);
-    let mapped_y = self.bottom_left.1
-        + (y as f64 / height as f64) * (self.top_left.1 - self.bottom_left.1);
-
-    (mapped_x, mapped_y)
-}
-
-}
-trait TrigExt {
-  fn cos_sin(&self) -> (f64, f64);
-}
-
-impl TrigExt for f64 {
-  fn cos_sin(&self) -> (f64, f64) {
-      (self.cos(), self.sin())
-  }
-}
-
-
 
 #[derive(Default)]
 pub struct Home {
@@ -215,7 +77,9 @@ pub struct Home {
   display_mode: DisplayMode,
   input_mode: InputMode,
   input_selector: InputSelector,
-  selected_color: ColorRGB,
+  hsv_mode: HSVMode,
+  hsv_color: ColorRGB,
+  //selected_color: ColorRGB, // take this out, oh just worked nice..
   color_history: Vec<Colors>,
   redo_history: Vec<Colors>,
 
@@ -226,6 +90,7 @@ pub struct Home {
   marker_type: Marker,
   anim_rect: Animation<DRect>,
   _anim_rect: DRect,
+  rect_spins: bool,
   _anim_cube: DCube,
 
   shade_list: StatefulList<(StyledLine, String)>, // string is shade
@@ -250,6 +115,7 @@ impl Home {
     this._anim_rect = DRect::new(80.0, 30.0, 40.0, 40.0);
     this._anim_cube = DCube::new(70.0, 30.0, 40.0, 40.0);
     this.shade_list = this.create_shade_list();
+    this.rect_spins = false;
     this
   }
 
@@ -422,8 +288,128 @@ impl Home {
   pub fn popup_palette(&mut self)  -> impl Widget + '_ {
     // Palette should be pickable either as a random palette or based on selected color
     // https://www.thecolorapi.com/docs
-    
+
     Paragraph::default()
+  }
+
+  pub fn popup_hsv(&mut self, f: &mut Frame<'_>, area: Rect) {
+
+
+    
+    let hsv_mode = self.hsv_mode;
+    let hsv_color = self.hsv_color.clone();
+    let _hsv = hsv_color.rgb_to_hsv();
+    // popup need three sliders
+    // H: 0   -> 360°
+    // S, V : -> 0% to 100%
+    let layout = Layout::default()
+      .direction(Direction::Vertical)
+      .constraints([Constraint::Percentage(20), Constraint::Percentage(80)])
+      .split(area);
+    // color in [0]
+    // Color
+    // Rest
+       
+    let titlestr = format!(" HSV for {} ", hsv_color.color.to_string());
+    f.render_widget(Paragraph::new("").bg(self.colors.background.color).block(Block::default().title(titlestr).title_alignment(Alignment::Center).borders(Borders::ALL).border_style(Style::new().fg(self.colors.background.flip_rgb()))), area);
+    
+
+    let input_layout = Layout::default()
+      .direction(Direction::Horizontal)
+      .constraints([Constraint::Percentage(33), Constraint::Percentage(33), Constraint::Percentage(33)])
+      .split(layout[1]);
+    // Rest
+    // split in three H S V
+    let slider_layout = hsv::make_slider_layout(input_layout[0]);
+
+    let border_col: Color;
+    if hsv_mode == HSVMode::H {border_col = self.colors.highlight.color;} else {border_col = self.colors.background.flip_rgb();}
+    let huecol = hsv::create_hue_column(&hsv_color);
+    f.render_widget(huecol, slider_layout[1]);
+    let hueval = _hsv.0 as u64;
+    let huebar = hsv::create_bar(&self.colors.background, hueval, 360, "Hue".to_string(), border_col);
+    f.render_widget(huebar, slider_layout[3]);
+
+    let slider_layout = hsv::make_slider_layout(input_layout[1]);
+
+
+    let border_col: Color;
+    if hsv_mode == HSVMode::S {border_col = self.colors.highlight.color;} else {border_col = self.colors.background.flip_rgb();}
+    let satcol = hsv::create_sat_column(&hsv_color);
+    f.render_widget(satcol, slider_layout[1]);
+    let satval = _hsv.1*100.0;
+    let satval = satval as u64;
+    let satbar = hsv::create_bar(&self.colors.background, satval, 100, "Sat".to_string(), border_col);
+    f.render_widget(satbar, slider_layout[3]);
+
+    let slider_layout = hsv::make_slider_layout(input_layout[2]);
+
+    let border_col: Color;
+    if hsv_mode == HSVMode::V {border_col = self.colors.highlight.color;} else {border_col = self.colors.background.flip_rgb();}
+    let valcol = hsv::create_val_column(&hsv_color);
+    f.render_widget(valcol, slider_layout[1]);
+    let valval = _hsv.2*100.0;
+    let valval = valval as u64;
+    let valbar = hsv::create_bar(&self.colors.background, valval, 100, "Val".to_string(), border_col);
+    f.render_widget(valbar, slider_layout[3]);
+
+
+    // Render the color itself
+    let color_layout = Layout::default()
+      .direction(Direction::Horizontal)
+      .constraints([Constraint::Percentage(10), Constraint::Percentage(80), Constraint::Percentage(10)])
+      .split(layout[0]);
+    let color_layout = Layout::default()
+      .direction(Direction::Vertical)
+      .constraints([Constraint::Percentage(10), Constraint::Percentage(80), Constraint::Percentage(10)])
+      .split(color_layout[1]);
+    let color_layout = Layout::default()
+      .direction(Direction::Vertical)
+      .constraints([Constraint::Percentage(50),Constraint::Percentage(50)])
+      .split(color_layout[1]);
+    // HSL https://stackoverflow.com/questions/39118528/rgb-to-hsl-conversion
+    // put color in layout[0]
+    // Paragraph::new("").bg(self.colors.background.color)
+    
+    f.render_widget(Paragraph::new("").bg(self.get_color_by_mode().color), color_layout[0]);
+    f.render_widget(Paragraph::new("").bg(hsv_color.color), color_layout[1]);
+
+    // HSV https://stackoverflow.com/questions/3018313/algorithm-to-convert-rgb-to-hsv-and-hsv-to-rgb-in-range-0-255-for-both
+
+  }
+
+  pub fn hsv_next_input(&mut self) {
+    match self.hsv_mode {
+      HSVMode::H => {self.hsv_mode = HSVMode::S;},
+      HSVMode::S => {self.hsv_mode = HSVMode::V;},
+      HSVMode::V => {self.hsv_mode = HSVMode::H;},
+    }
+  }
+
+  pub fn hsv_prev_input(&mut self) {
+    match self.hsv_mode {
+      HSVMode::H => {self.hsv_mode = HSVMode::V;},
+      HSVMode::S => {self.hsv_mode = HSVMode::H;},
+      HSVMode::V => {self.hsv_mode = HSVMode::S;},
+    }
+  }
+
+  pub fn hsv_increase_by_mode(&mut self) {
+    match self.hsv_mode {
+      HSVMode::H => {self.hsv_color = self.hsv_color.shift_hue(1.0);},//{self.hsv_color;},
+      HSVMode::S => {self.hsv_color = self.hsv_color.shift_saturation(0.01);},
+      HSVMode::V => {self.hsv_color = self.hsv_color.shift_value(0.01);},
+    }
+    self.command_tx.clone().unwrap().send(Action::Render).expect("Error increasing HSV");
+  }
+
+  pub fn hsv_decrease_by_mode(&mut self) {
+    match self.hsv_mode {
+      HSVMode::H => {self.hsv_color = self.hsv_color.shift_hue(-1.0);},//{self.hsv_color;},
+      HSVMode::S => {self.hsv_color = self.hsv_color.shift_saturation(-0.01);},
+      HSVMode::V => {self.hsv_color = self.hsv_color.shift_value(-0.01);},
+    }    
+    self.command_tx.clone().unwrap().send(Action::Render).expect("Error decreasing HSV");
   }
 
 
@@ -466,12 +452,26 @@ impl Home {
         }
       }
     }
-
-
-
-    
   }
 
+  fn submit_hsv(&mut self) {
+    if self.display_mode == DisplayMode::HSV {
+      if self.hsv_color != ColorRGB::default() {
+        let colors = self.make_colors_by_mode(self.hsv_color.clone());
+        self.change_color(colors);
+      }
+    }
+  }
+
+  fn submit_input_by_displaymode(&mut self){
+    match self.display_mode {
+          DisplayMode::Normal => {},
+          DisplayMode::InputPrompt => {self.submit_input();},
+          DisplayMode::HSV => {self.submit_hsv();},
+          DisplayMode::Shades => {self.submit_shade();},
+    }
+  }
+  
   fn parse_rgb(&mut self) {
 
    let reg = RGB_REGEX.get_or_init(|| Regex::new(r"(\d{1,3})").unwrap());
@@ -553,17 +553,30 @@ impl Home {
     }
   }
 
+  fn switch_marker_type(&mut self) {
+
+    match self.marker_type {
+      Marker::Bar => {self.marker_type = Marker::Block;},
+      Marker::Block => {self.marker_type = Marker::Braille;},
+      Marker::Braille => {self.marker_type = Marker::Dot;},
+      Marker::Dot => {self.marker_type = Marker::HalfBlock;},
+      Marker::HalfBlock => {self.marker_type = Marker::Bar;}
+    }
+
+  }
 
   pub fn create_canvas(&mut self, area: &Rect) -> impl Widget + '_ { 
 
-    let sel_rect = self._anim_rect.rot(15.0);
-    self._anim_rect = sel_rect.clone();
+    //let sel_rect = self._anim_rect.rot(1.0);
+    //self._anim_rect = sel_rect.clone();
     //let sel_rect = sel_rect.clone();
-
+    
+    let sel_rect: DRect = if self.rect_spins {
+      let _r = self._anim_rect.rot(1.0);
+      self._anim_rect = _r.clone();
+      _r
+    } else {self._anim_rect.clone()};
     //self._anim_cube.rotate(15.0, 'z');
-
-    //let _anim_cube = self._anim_cube.clone();
-
     canvas::Canvas::default()
     .background_color(self.colors.background.color)
     .block(Block::default().borders(Borders::ALL).title("").bg(self.colors.background.color).fg(self.colors.background.flip_rgb()))
@@ -657,26 +670,41 @@ impl Component for Home{
 
   fn update(&mut self, action: Action) -> Result<Option<Action>> {
     match action {
+      // Actions that should always work, no matter the mode
       Action::Tick => {
         
       },
       Action::Render => {
         self.anim_querycursor.next();
-        self.anim_rect.next();}
-      Action::NextColor => {self.next_color(); }, // self.select_color_by_mode();
-      Action::PreviousColor => {self.previous_color();}, // self.select_color_by_mode();
-      Action::InputHEX => {self.input_mode = InputMode::HEX;},
-      Action::InputRGB => {self.input_mode = InputMode::RGB;},
-      Action::InputPrompt => {if self.display_mode != DisplayMode::InputPrompt {self.display_mode = DisplayMode::InputPrompt} else {self.display_mode = DisplayMode::Normal};}
-      Action::SubmitInput => {self.submit_input(); self.submit_shade();},
+        self.anim_rect.next();},
       Action::ChangeUndo => {self.undo_change();},
       Action::ChangeRedo => {self.redo_change();},
+      Action::InputPrompt => {if self.display_mode != DisplayMode::InputPrompt {self.display_mode = DisplayMode::InputPrompt} else {self.display_mode = DisplayMode::Normal};}
       Action::ShowShades => {if self.display_mode != DisplayMode::Shades {self.display_mode = DisplayMode::Shades} else {self.display_mode = DisplayMode::Normal};},
-      Action::NextShade => {self.shade_list.next();}
-      Action::PreviousShade => {self.shade_list.previous();}
-      Action::InvertColor => {self.invert_color();}
-      Action::InvertAll => {self.invert_all();}
-      _ => {},
+      Action::NextColor => {self.next_color(); }, // self.select_color_by_mode();
+      Action::PreviousColor => {self.previous_color();}, // self.select_color_by_mode();
+      Action::InvertColor => {self.invert_color();},
+      Action::InvertAll => {self.invert_all();},
+      Action::SwitchMarker => {self.switch_marker_type();},
+      Action::ToggleSpin => {if self.rect_spins {self.rect_spins = false;} else {self.rect_spins = true;}},
+      Action::ToggleHSV => {if self.display_mode != DisplayMode::HSV {self.display_mode = DisplayMode::HSV; self.hsv_color = self.get_color_by_mode();} else {self.display_mode = DisplayMode::Normal};},      
+      Action::SubmitInput => { self.submit_input_by_displaymode();},
+
+      // Only in Inputprompt
+      Action::InputHEX => {self.input_mode = InputMode::HEX;},
+      Action::InputRGB => {self.input_mode = InputMode::RGB;},
+      
+      // Only in shades
+      Action::NextShade => {self.shade_list.next();},
+      Action::PreviousShade => {self.shade_list.previous();},
+
+      // Only in HSV
+      Action::HSVPrev => {self.hsv_prev_input();},
+      Action::HSVNext => {self.hsv_next_input();},
+      Action::HSVIncrease => {self.hsv_increase_by_mode();},
+      Action::HSVDecrease => {self.hsv_decrease_by_mode();},
+
+      _ => {}, // pass the remaining functions here to match mode before proceeding further
     }
     Ok(None)
   }
@@ -773,7 +801,12 @@ impl Component for Home{
         //f.render_stateful_widget(shadelist, centered_rect(area, 32, 38), &mut self.shade_list.state);
         f.render_widget(Clear, popuplayout[1]);
         f.render_stateful_widget(shadelist, popuplayout[1], &mut self.shade_list.state);
-      }
+      },
+      DisplayMode::HSV => {
+
+        f.render_widget(Clear, popuplayout[1]);
+        self.popup_hsv(f, popuplayout[1]);
+      },
     };
 
     Ok(())
