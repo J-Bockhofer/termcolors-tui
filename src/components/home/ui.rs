@@ -155,7 +155,7 @@ pub fn create_paragraph_line(text: String, color: ColorRGB, bkgcolor: ColorRGB) 
     ]);
     line.spans.push(Span::styled(format!(" Ctr: {:.2} ", get_contrast(&color, &bkgcolor)), Style::new().fg(bkgcolor.flip_rgb())));
     let _hsv = color.rgb_to_hsv();
-    let h = pad_to_length(format!("{:.0}", _hsv.0), 4);
+    let h = leftpad_to_length(format!("{:.0}", _hsv.0), 4);
     let s = pad_to_length(format!("{:.2}", _hsv.1), 4);
     let v = pad_to_length(format!("{:.2}", _hsv.2), 4 );
     let _hsv = pad_to_length(format!(" HSV: {} {} {} ", h, s, v),20);
