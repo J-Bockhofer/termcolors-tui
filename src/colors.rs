@@ -2,6 +2,7 @@
 use ratatui::prelude::Color;
 use std::{str::FromStr, fmt::Error};
 
+
 #[derive(Default, Clone)]
 pub struct Colors {
   pub background: ColorRGB,
@@ -11,7 +12,7 @@ pub struct Colors {
   pub highlight: ColorRGB,
 }
 
-#[derive(Default, Clone, PartialEq, Eq)]
+#[derive(Default, Clone, PartialEq, Eq, Debug)]
 pub struct ColorRGB {
   pub color: Color,
   pub r: u8,
@@ -73,6 +74,8 @@ impl ColorRGB {
   }
 
   /// Creates a new ColorRGB from a ratatui Color via its hex representation 
+  /// 
+  /// Will return Error for colors that don't return a Hex !
   pub fn from_color(color: Color) -> Result<Self, Error> {
     Self::from_hex(&color.to_string())
   }
@@ -85,15 +88,43 @@ impl ColorRGB {
   }
 
 
+  /// Classical forward conversion (from RGB to HSV) requires the following steps:
+  /// 1. Find maximum (M) and minimum (m) of R; G, and B.
+  /// M = max(R; G; B)
+  /// m = min(R; G; B)
+  /// 2. Assign V = M.
+  /// 3. Calculate delta (d) between M and m.
+  ///   d = M - m
+  /// 4. If d is equal to 0 then assign S with 0 and return. H is undefined in this case.
+  /// 5. Calculate S as a ratio of d and M.
+  ///   S = d / M
+  /// 6. Calculate H depending on what are M and m. - based on hue being between 0. and 1.
+  /// 
+  /// Ref: https://doi.org/10.1016/j.compeleceng.2015.08.005.
+  /// 
+  /// Ref: https://dl.acm.org/doi/abs/10.1145/965139.807361
+
   pub fn rgb_to_hsv(&self) -> (f64, f64, f64) {
     let r = f64::from(self.r) / 255.0;
     let g = f64::from(self.g) / 255.0;
     let b = f64::from(self.b) / 255.0;
-
+    // 1.
     let c_max = r.max(g).max(b);
     let c_min = r.min(g).min(b);
-    let delta = c_max - c_min;
 
+    // 2.
+    let value = c_max;
+    // 3.
+    let delta = c_max - c_min;
+    // 4.
+    let saturation = if c_max.abs() < f64::EPSILON {
+      0.0
+    } else {
+      // 5.
+        delta / c_max
+    };
+
+    // 6. is different due to needing to convert to degrees
     let hue = if delta.abs() < f64::EPSILON {
         0.0
     } else if c_max == r {
@@ -104,22 +135,26 @@ impl ColorRGB {
         60.0 * ((r - g) / delta + 4.0)
     };
 
-    let saturation = if c_max.abs() < f64::EPSILON {
-        0.0
-    } else {
-        delta / c_max
-    };
+    
+    round_hsv((hue, saturation, value))
 
-    let value = c_max;
-
-    (hue, saturation, value)
   }
 
+
+  /// Ref: https://en.wikipedia.org/wiki/HSL_and_HSV#Color_conversion_formulae
+  /// 
+  /// Lossy !
+  /// 
+  /// Same behaviour as https://lib.rs/crates/hsv
   pub fn from_hsv(hsv: (f64, f64, f64)) -> Self {
-    let (hue, saturation, value) = hsv;
+
+    let (hue, saturation, value) = round_hsv(hsv);
+
 
     let c = value * saturation;
+
     let x = c * (1.0 - ((hue / 60.0) % 2.0 - 1.0).abs());
+
     let m = value - c;
 
     let (r, g, b) = if hue < 60.0 {
@@ -179,11 +214,30 @@ impl ColorRGB {
 
 }
 
+/// rounds hue to nearest integer and saturation / value to three decimal places
+pub fn round_hsv(hsv: (f64, f64, f64)) -> (f64, f64, f64) {
+  let mut h = hsv.0;
+  let mut s = hsv.1;
+  let mut v = hsv.2;
+  // round degrees to nearest integer
+  let _dhue = h - h.floor();
+  if _dhue >= 0.5 {
+    h = h.ceil();
+  } else {
+    h = h.floor();
+  }
+  // round sat & val to three decimal places
+  s = (s * 1000.0).round() / 1000.0;
+  v = (v * 1000.0).round() / 1000.0;
 
-pub fn normalize_chan(x: u8) -> f32 {
+  (h,s,v)
+}
+
+
+fn normalize_chan(x: u8) -> f32 {
     x as f32 / u8::MAX as f32
 }
-pub fn linearize_chan(x:f32) -> f32 {
+fn linearize_chan(x:f32) -> f32 {
     x.powf(2.2)
 }
 pub fn get_luminance(x: &ColorRGB) -> f32 {
@@ -229,3 +283,146 @@ pub fn darken_channel(x: u8, dec: f32) -> u8 {
   let __x = _x as u8;
   x.saturating_sub(__x)
 }
+
+
+
+#[cfg(test)]
+mod tests {
+  use pretty_assertions::assert_eq;
+
+  use super::*;
+
+
+  #[test]
+  fn test_output_hex_from_rgb() {
+    // https://www.rapidtables.com/convert/color/rgb-to-hsv.html
+    // hex: #00EEEC
+    // rgb: 0, 238, 236
+    // hsv: 179° 100% 93.3%
+    
+    let rgb: (u8, u8, u8) = (0, 238, 236);
+    let color = ColorRGB::new(rgb.0, rgb.1, rgb.2);
+    let hex = color.color.to_string();
+
+    assert_eq!(hex, "#00EEEC".to_string());
+  }  
+  #[test]
+  fn test_output_hex_from_hex() {
+    // https://www.rapidtables.com/convert/color/rgb-to-hsv.html
+    // hex: #00EEEC
+    // rgb: 0, 238, 236
+    // hsv: 179° 100% 93.3%
+
+    let color = ColorRGB::from_hex("#00EEEC").unwrap();
+    let hex = color.color.to_string();
+
+    assert_eq!(hex, "#00EEEC".to_string());
+  } 
+
+  #[test]
+  fn test_output_rgb_from_hsv() {
+    // https://www.rapidtables.com/convert/color/rgb-to-hsv.html
+    // hex: #00EEEC
+    // rgb: 0, 238, 236
+    // hsv: 179° 100% 93.3%
+
+    let color = ColorRGB::from_hsv((179.0, 1.0, 0.933));
+    assert_eq!(format!("{}, {}, {}", color.r, color.g, color.b), "0, 238, 236".to_string());
+  }
+
+
+  #[test]
+  fn test_output_hex_from_hsv() {
+    // https://www.rapidtables.com/convert/color/rgb-to-hsv.html
+    // hex: #00EEEC
+    // rgb: 0, 238, 236
+    // hsv: 179° 100% 93.3%
+
+    let color = ColorRGB::from_hsv((179.0, 1.0, 0.933));
+    let hex = color.color.to_string();
+
+    assert_eq!(hex, "#00EEEC".to_string());
+  }
+
+  #[test]
+  fn test_output_hsv_from_rgb() {
+    // https://www.rapidtables.com/convert/color/rgb-to-hsv.html
+    // hex: #00EEEC
+    // rgb: 0, 238, 236
+    // hsv: 179° 100% 93.3%
+    
+    let rgb: (u8, u8, u8) = (0, 238, 236);
+    let color = ColorRGB::new(rgb.0, rgb.1, rgb.2);
+    let hsv = color.rgb_to_hsv();
+
+    assert_eq!(hsv, (179.0, 1.0, 0.933));
+  }  
+  #[test]
+  fn test_output_hsv_from_hex() {
+    // https://www.rapidtables.com/convert/color/rgb-to-hsv.html
+    // hex: #00EEEC
+    // rgb: 0, 238, 236
+    // hsv: 179° 100% 93.3%
+
+    let color = ColorRGB::from_hex("#00EEEC").unwrap();
+    let hsv = color.rgb_to_hsv();
+
+    assert_eq!(hsv, (179.0, 1.0, 0.933));
+  } 
+  
+  #[test]
+  fn test_output_hsv_from_hsv() {
+    // https://www.rapidtables.com/convert/color/rgb-to-hsv.html
+    // hex: #00EEEC
+    // rgb: 0, 238, 236
+    // hsv: 179° 100% 93.3%
+
+    let color = ColorRGB::from_hsv((179.0, 1.0, 0.933)); // this method has precision loss
+
+    let hsv = color.rgb_to_hsv();
+
+    assert_eq!(hsv, (179.0, 1.0, 0.933));
+  }
+
+
+  #[test]
+  fn test_output_hsv() {
+    // https://www.rapidtables.com/convert/color/rgb-to-hsv.html
+    // hex: #00EEEC
+    // rgb: 0, 238, 236
+    // hsv: 179° 100% 93.3%
+    
+    let rgb: (u8, u8, u8) = (0, 238, 236);
+    let color = ColorRGB::new(rgb.0, rgb.1, rgb.2);
+
+    let hsv = color.rgb_to_hsv();
+
+    assert_eq!(format!("{:.0}, {:.2}, {:.3}", hsv.0, hsv.1, hsv.2), format!("179, 1.00, 0.933"));
+  }  
+
+  #[test]
+  fn test_parse_rgb_hex_rgb() {
+    let rgb: (u8, u8, u8) = (144, 76, 98);
+    let color = ColorRGB::new(rgb.0, rgb.1, rgb.2);
+    let hex = color.color.to_string();
+    let fromhex = ColorRGB::from_hex(&hex).unwrap();
+    let _rgb = (fromhex.r, fromhex.g, fromhex.b);
+
+    assert_eq!(rgb, _rgb);
+  }
+
+  #[test]
+  fn test_parse_rgb_hsv_rgb() {
+    let rgb: (u8, u8, u8) = (144, 76, 98);
+    let color = ColorRGB::new(rgb.0, rgb.1, rgb.2);
+    let hsv = color.rgb_to_hsv();
+    let _color = ColorRGB::from_hsv(hsv);
+    let _rgb = (_color.r, _color.g, _color.b);
+
+    assert_eq!(rgb, _rgb);
+  }  
+
+
+
+}
+
