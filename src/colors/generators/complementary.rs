@@ -2,27 +2,31 @@ use crate::colors::{ColorRGB, Colors};
 
 pub fn generate_complementary(color: ColorRGB, num_colors: usize) -> Colors {
     // need to find if the passed color is light or dark
+    // need to find if the passed color is light or dark
     let base_hsv = color.rgb_to_hsv();
     let base_hue = base_hsv.0;
 
-    let mut palette = Vec::with_capacity(num_colors);
+    // Generate lighter and darker shades for the base color
+    let lighter_shade = ColorRGB::from_hsv((base_hue, base_hsv.1, base_hsv.2 * 1.2));
+    let darker_shade = ColorRGB::from_hsv((base_hue, base_hsv.1, base_hsv.2 * 0.8));
 
-    // Add the original color to the palette
-    palette.push(color.clone());
+    // Generate the complementary color
+    let complementary_color = ColorRGB::from_hsv(((base_hue + 180.0) % 360.0, base_hsv.1, base_hsv.2));
 
-    for i in 0..(num_colors - 1) {
-        let hue = (base_hue + 180.0 * ((i + 1) as f64)) % 360.0;
-        let complementary_color = ColorRGB::from_hsv((hue, base_hsv.1, base_hsv.2));
-        palette.push(complementary_color);
+    // Generate an additional shade for the complementary color
+    let additional_shade = if base_hsv.2 < 0.5 {
+        ColorRGB::from_hsv(((base_hue + 180.0) % 360.0, base_hsv.1, base_hsv.2 * 0.6)) // Darker shade
+    } else {
+        ColorRGB::from_hsv(((base_hue + 180.0) % 360.0, base_hsv.1, base_hsv.2 * 1.4)) // Lighter shade
+    };
+
+    Colors {
+        background: darker_shade.clone(), // 
+        color_a: color.clone(),
+        color_b: lighter_shade.clone(),
+        color_c: additional_shade.clone(),
+        highlight: complementary_color.clone(),
     }
-
-		Colors {
-			background: palette[0].clone(),
-			color_a: palette[1].clone(),
-			color_b: palette[2].clone(),
-			color_c: palette[3].clone(),
-			highlight: palette[4].clone(),
-		}
     
 }
 

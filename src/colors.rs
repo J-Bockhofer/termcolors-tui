@@ -2,7 +2,6 @@
 use ratatui::prelude::Color;
 use std::{str::FromStr, fmt::Error};
 
-pub mod palettes;
 
 pub mod generators;
 

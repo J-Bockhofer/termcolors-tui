@@ -8,33 +8,29 @@
       "<Tab>": "NextColor", // Switch Input to next color 
       "<BackTab>": "PreviousColor", // Switch Input to previous color 
 
-      "<Left>": "InputHEX", // Switch Input to HEX 
-      "<Right>": "InputRGB", // Switch Input to RGB
+      "<Left>": "SelectLeft", // Context dependent left selection (previous)
+      "<Right>": "SelectRight", // Context dependent right selection (next)
+      "<Up>": "SelectUp", // Context dependent left selection (previous)
+      "<Down>": "SelectDown", // Context dependent right selection (next)      
+      "<Shift-w>": "ColorUp", // Switches the selected color with the one above 
+      "<Shift-s>": "ColorDown", // Switches the selected color with the one below
+
       "<q>": "Input", // Open the input prompt
 
-      "<Enter>": "SubmitInput", // Submit your input in query, shade and HSV
+      "<Enter>": "SubmitInput", // Submit your input in query, shade, HSV and palette
 
       "<Ctrl-z>": "Undo", // Undo last change
       "<Ctrl-y>": "Redo", // Redo last Undo
 
       "<s>": "Shades", // Show Shades for selected
-      "<Up>": "PreviousShade", // Navigate Shades 
-      "<Down>": "NextShade", // Navigate Shades 
 
       "<i>": "InvertColor", // Inverts the selected color
       "<Shift-i>": "InvertAll", // Inverts all colors
 
       "<y>": "HSV", // shows HSV input for selected color
-      "<h>": "HSVPrev", // Switch between H, S and V input
-      "<l>": "HSVNext", // Switch between H, S and V input
-      "<j>": "HSVIncrease", // Switch between H, S and V input
-      "<k>": "HSVDecrease", // Switch between H, S and V input
 
       "<m>": "SwitchMarker", // Switches the marker type between Bar, Block, Braille, Dot and HalfBlock (default Braille)
       "<n>": "ToggleSpin", // spins the rectangle if turned on 
-
-      "<Shift-w>": "ColorUp", // Switches the selected color with the one above 
-      "<Shift-s>": "ColorDown", // Switches the selected color with the one below
 
       "<x>": "Palette", // Views the Palette selector
 

@@ -21,8 +21,9 @@ pub fn generate_split_complementary(color: ColorRGB) -> Colors {
     let darker_shade = ColorRGB::from_hsv((base_hue, base_hsv.1, base_hsv.2 * 0.8));
     let lighter_shade = ColorRGB::from_hsv((base_hue, base_hsv.1, base_hsv.2 * 1.2));
 
-    palette.push(darker_shade);
+    
     palette.push(lighter_shade);
+    palette.push(darker_shade);
     
     Colors {
         background: palette[4].clone(),

@@ -23,8 +23,10 @@ use super::{Component, Frame};
 use crate::{
   action::Action,
   config::{Config, KeyBindings},
-  colors::{Colors, ColorRGB, get_contrast, generators},
+  colors::{Colors, ColorRGB, get_contrast, generators::{self, Harmony}},
 };
+
+use tui_input::{backend::crossterm::EventHandler, Input};
 
 use std::sync::OnceLock;
 use regex::Regex;
@@ -74,12 +76,15 @@ pub struct Home {
   command_tx: Option<UnboundedSender<Action>>,
   config: Config,
   colors: Colors,
+
+  pub input: Input,
   
   display_mode: DisplayMode,
   input_mode: InputMode,
   input_selector: InputSelector,
   hsv_mode: HSVMode,
   hsv_color: ColorRGB,
+  selected_harmony: Harmony,
   //selected_color: ColorRGB, // take this out, oh just worked nice..
   color_history: Vec<Colors>,
   redo_history: Vec<Colors>,
@@ -298,17 +303,17 @@ impl Home {
     // Palette should be pickable either as a random palette or based on selected color
     // https://www.thecolorapi.com/docs
     let lines = vec![
-      Line::from(vec![  Span::styled(" Mon ", Style::new().fg(self.colors.background.flip_rgb())),
+      Line::from(vec![  Span::styled(" Mon ", Style::new().fg(if self.selected_harmony == Harmony::Monochromatic {self.colors.highlight.color} else {self.colors.background.flip_rgb()} )),
                         Span::styled("     ", Style::new()),
-                        Span::styled(" Ana ", Style::new().fg(self.colors.background.flip_rgb())),
+                        Span::styled(" Ana ", Style::new().fg(if self.selected_harmony == Harmony::Analogous {self.colors.highlight.color} else {self.colors.background.flip_rgb()} )),
                         Span::styled("     ", Style::new()),
-                        Span::styled(" Com ", Style::new().fg(self.colors.background.flip_rgb())),
+                        Span::styled(" Com ", Style::new().fg(if self.selected_harmony == Harmony::Complementary {self.colors.highlight.color} else {self.colors.background.flip_rgb()} )),
                         Span::styled("     ", Style::new()),
-                        Span::styled(" Spl ", Style::new().fg(self.colors.background.flip_rgb())),
+                        Span::styled(" Spl ", Style::new().fg(if self.selected_harmony == Harmony::SplitComplementary {self.colors.highlight.color} else {self.colors.background.flip_rgb()} )),
                         Span::styled("     ", Style::new()),
-                        Span::styled(" Tri ", Style::new().fg(self.colors.background.flip_rgb())),
+                        Span::styled(" Tri ", Style::new().fg(if self.selected_harmony == Harmony::Triadic {self.colors.highlight.color} else {self.colors.background.flip_rgb()} )),
                         Span::styled("     ", Style::new()),
-                        Span::styled(" Tet ", Style::new().fg(self.colors.background.flip_rgb())),
+                        Span::styled(" Tet ", Style::new().fg(if self.selected_harmony == Harmony::Tetradic {self.colors.highlight.color} else {self.colors.background.flip_rgb()} )),
       ]),
 
 
@@ -465,6 +470,7 @@ impl Home {
   }
 
   pub fn hsv_next_input(&mut self) {
+    if self.display_mode != DisplayMode::HSV {return}
     match self.hsv_mode {
       HSVMode::H => {self.hsv_mode = HSVMode::S;},
       HSVMode::S => {self.hsv_mode = HSVMode::V;},
@@ -473,6 +479,7 @@ impl Home {
   }
 
   pub fn hsv_prev_input(&mut self) {
+    if self.display_mode != DisplayMode::HSV {return}
     match self.hsv_mode {
       HSVMode::H => {self.hsv_mode = HSVMode::V;},
       HSVMode::S => {self.hsv_mode = HSVMode::H;},
@@ -481,6 +488,7 @@ impl Home {
   }
 
   pub fn hsv_increase_by_mode(&mut self) {
+    if self.display_mode != DisplayMode::HSV {return}
     match self.hsv_mode {
       HSVMode::H => {self.hsv_color = self.hsv_color.shift_hue(1.0);},//{self.hsv_color;},
       HSVMode::S => {self.hsv_color = self.hsv_color.shift_saturation(0.01);},
@@ -490,6 +498,7 @@ impl Home {
   }
 
   pub fn hsv_decrease_by_mode(&mut self) {
+    if self.display_mode != DisplayMode::HSV {return}
     match self.hsv_mode {
       HSVMode::H => {self.hsv_color = self.hsv_color.shift_hue(-1.0);},//{self.hsv_color;},
       HSVMode::S => {self.hsv_color = self.hsv_color.shift_saturation(-0.01);},
@@ -497,6 +506,33 @@ impl Home {
     }    
     self.command_tx.clone().unwrap().send(Action::Render).expect("Error decreasing HSV");
   }
+
+  pub fn palette_next(&mut self) {
+    if self.display_mode != DisplayMode::Palette {return}
+    match self.selected_harmony {
+      Harmony::Monochromatic => {self.selected_harmony = Harmony::Analogous},
+      Harmony::Analogous => {self.selected_harmony = Harmony::Complementary},  
+      Harmony::Complementary => {self.selected_harmony = Harmony::SplitComplementary},
+      Harmony::SplitComplementary => {self.selected_harmony = Harmony::Triadic},
+      Harmony::Triadic => {self.selected_harmony = Harmony::Tetradic},
+      Harmony::Tetradic => {self.selected_harmony = Harmony::Monochromatic},    
+    }
+  }
+
+  pub fn palette_previous(&mut self) {
+    if self.display_mode != DisplayMode::Palette {return}
+    match self.selected_harmony {
+      Harmony::Monochromatic => {self.selected_harmony = Harmony::Tetradic},
+      Harmony::Analogous => {self.selected_harmony = Harmony::Monochromatic},
+      Harmony::Complementary => {self.selected_harmony = Harmony::Analogous},
+      Harmony::SplitComplementary => {self.selected_harmony = Harmony::Complementary},
+      Harmony::Triadic => {self.selected_harmony = Harmony::SplitComplementary },
+      Harmony::Tetradic => {self.selected_harmony = Harmony::Triadic},   
+    }
+  }
+
+
+
 
 
   pub fn add_to_inputstr(&mut self, ch: char) {
@@ -549,16 +585,63 @@ impl Home {
     }
   }
 
-  fn submit_input_by_displaymode(&mut self){
+  pub fn submit_palette(&mut self) {
+    if self.display_mode != DisplayMode::Palette {return}
+    let color = self.get_color_by_mode();
+    let colors = generators::generate_palette_with_harmony(color, self.selected_harmony);
+    self.change_color(colors);
+  }
+
+  pub fn submit_input_by_displaymode(&mut self){
     match self.display_mode {
           DisplayMode::Normal => {},
           DisplayMode::InputPrompt => {self.submit_input();},
           DisplayMode::HSV => {self.submit_hsv();},
           DisplayMode::Shades => {self.submit_shade();},
-          DisplayMode::Palette => {},
+          DisplayMode::Palette => {self.submit_palette();},
     }
   }
-  
+
+  pub fn select_left_by_displaymode(&mut self) {
+    match self.display_mode {
+      DisplayMode::Normal => {},
+      DisplayMode::InputPrompt => {self.input_mode = InputMode::HEX;},
+      DisplayMode::HSV => {self.hsv_prev_input();},
+      DisplayMode::Shades => {},
+      DisplayMode::Palette => {self.palette_previous();},
+    }
+  }
+
+  pub fn select_right_by_displaymode(&mut self) {
+    match self.display_mode {
+      DisplayMode::Normal => {},
+      DisplayMode::InputPrompt => {self.input_mode = InputMode::RGB;},
+      DisplayMode::HSV => {self.hsv_next_input();},
+      DisplayMode::Shades => {},
+      DisplayMode::Palette => {self.palette_next();},
+    }
+  }
+
+  pub fn select_up_by_displaymode(&mut self) {
+    match self.display_mode {
+      DisplayMode::Normal => {self.previous_color();},
+      DisplayMode::InputPrompt => {},
+      DisplayMode::HSV => {self.hsv_increase_by_mode();},
+      DisplayMode::Shades => {self.shade_list.previous();},
+      DisplayMode::Palette => {},
+    }
+  }
+
+  pub fn select_down_by_displaymode(&mut self) {
+    match self.display_mode {
+      DisplayMode::Normal => {self.next_color();},
+      DisplayMode::InputPrompt => {},
+      DisplayMode::HSV => {self.hsv_decrease_by_mode();},
+      DisplayMode::Shades => {self.shade_list.next();},
+      DisplayMode::Palette => {},
+    }
+  }
+
   fn parse_rgb(&mut self) {
 
    let reg = RGB_REGEX.get_or_init(|| Regex::new(r"(\d{1,3})").unwrap());
@@ -782,11 +865,11 @@ impl Component for Home{
                 'E'|'e' => {self.add_to_inputstr('e');},
                 'F'|'f' => {self.add_to_inputstr('f');},
                 '#' => {self.add_to_inputstr('#');},
-                _ => {}
+                _ => {self.input.handle_event(&crossterm::event::Event::Key(key));}
               }
             return Ok(Some(Action::Render))
             },
-            _ => {}       
+            _ => {self.input.handle_event(&crossterm::event::Event::Key(key));}       
           }
         },
         InputMode::RGB => {
@@ -807,11 +890,11 @@ impl Component for Home{
                 ',' => {self.add_to_inputstr(',');},
                 '(' => {self.add_to_inputstr('(');},
                 ')' => {self.add_to_inputstr(')');},
-                _ => {}
+                _ => {self.input.handle_event(&crossterm::event::Event::Key(key));}
               }
               return Ok(Some(Action::Render))
             },
-            _ => {}
+            _ => {self.input.handle_event(&crossterm::event::Event::Key(key));}
           }
         }
       };
@@ -841,24 +924,15 @@ impl Component for Home{
       Action::ToggleHSV => {if self.display_mode != DisplayMode::HSV {self.display_mode = DisplayMode::HSV; self.hsv_color = self.get_color_by_mode();} else {self.display_mode = DisplayMode::Normal};},      
       Action::SubmitInput => { self.submit_input_by_displaymode();},
 
-      // Only in Inputprompt
-      Action::InputHEX => {self.input_mode = InputMode::HEX;},
-      Action::InputRGB => {self.input_mode = InputMode::RGB;},
-      
-      // Only in shades
-      Action::NextShade => {self.shade_list.next();},
-      Action::PreviousShade => {self.shade_list.previous();},
-
-      // Only in HSV
-      Action::HSVPrev => {self.hsv_prev_input();},
-      Action::HSVNext => {self.hsv_next_input();},
-      Action::HSVIncrease => {self.hsv_increase_by_mode();},
-      Action::HSVDecrease => {self.hsv_decrease_by_mode();},
-
       Action::ColorUp => {self.color_up_by_selection();},
       Action::ColorDown => {self.color_down_by_selection();},
 
       Action::TogglePalette => {if self.display_mode != DisplayMode::Palette {self.display_mode = DisplayMode::Palette; self.hsv_color = self.get_color_by_mode();} else {self.display_mode = DisplayMode::Normal};}
+
+      Action::SelectLeft => {self.select_left_by_displaymode();},
+      Action::SelectRight => {self.select_right_by_displaymode();},
+      Action::SelectUp => {self.select_up_by_displaymode();},
+      Action::SelectDown => {self.select_down_by_displaymode();},      
 
       _ => {}, // pass the remaining functions here to match mode before proceeding further
     }
@@ -887,31 +961,30 @@ impl Component for Home{
     f.render_widget(self.create_canvas(&layout[1]), layout[1]);
 
     let canvaslayout = Layout::default()
-    .direction(Direction::Horizontal)
-    .constraints([Constraint::Percentage(10), Constraint::Percentage(20), Constraint::Percentage(2),  Constraint::Percentage(36), Constraint::Percentage(32)])
-    .split(layout[1]);
+      .direction(Direction::Horizontal)
+      .constraints([Constraint::Percentage(10), Constraint::Percentage(20), Constraint::Percentage(2),  Constraint::Percentage(36), Constraint::Percentage(32)])
+      .split(layout[1]);
 
     let popuplayout = Layout::default()
-    .direction(Direction::Vertical)
-    .constraints([Constraint::Percentage(10), Constraint::Percentage(80), Constraint::Percentage(10)])
-    .split(canvaslayout[3]);
+      .direction(Direction::Vertical)
+      .constraints([Constraint::Percentage(10), Constraint::Percentage(80), Constraint::Percentage(10)])
+      .split(canvaslayout[3]);
 
     let div = Layout::default()
-    .direction(Direction::Vertical)
-    .constraints([Constraint::Percentage(10), Constraint::Percentage(80), Constraint::Percentage(10)])
-    .split(canvaslayout[1]);
+      .direction(Direction::Vertical)
+      .constraints([Constraint::Percentage(10), Constraint::Percentage(80), Constraint::Percentage(10)])
+      .split(canvaslayout[1]);
 
     let blocklayout = Layout::default()
-    .direction(Direction::Vertical)
-    .constraints([Constraint::Percentage(2), Constraint::Percentage(20), Constraint::Percentage(5), Constraint::Percentage(20), Constraint::Percentage(5), Constraint::Percentage(20), Constraint::Percentage(5), Constraint::Percentage(20), Constraint::Percentage(2)])
-    .split(div[1]);
+      .direction(Direction::Vertical)
+      .constraints([Constraint::Percentage(2), Constraint::Percentage(20), Constraint::Percentage(5), Constraint::Percentage(20), Constraint::Percentage(5), Constraint::Percentage(20), Constraint::Percentage(5), Constraint::Percentage(20), Constraint::Percentage(2)])
+      .split(div[1]);
+
     f.render_widget(Paragraph::new("").bg(self.colors.background.color), div[1]);
     f.render_widget(Paragraph::new("").bg(self.colors.color_a.color), blocklayout[1]);
     f.render_widget(Paragraph::new("").bg(self.colors.color_b.color), blocklayout[3]);
     f.render_widget(Paragraph::new("").bg(self.colors.color_c.color), blocklayout[5]);
     f.render_widget(Paragraph::new("").bg(self.colors.highlight.color), blocklayout[7]);
-
-
 
 
     match self.display_mode {

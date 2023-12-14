@@ -5,7 +5,7 @@ pub fn generate_analogous(color: ColorRGB) -> Colors {
     let base_hsv = color.rgb_to_hsv();
     let base_hue = base_hsv.0;
     const HUE_DIFFERENCE: f64 = 30.0;
-    const NUM_COLORS: usize = 5;
+    const NUM_COLORS: usize = 3;
 
     let mut palette = Vec::with_capacity(NUM_COLORS);
 
@@ -15,12 +15,20 @@ pub fn generate_analogous(color: ColorRGB) -> Colors {
         palette.push(analogous_color);
     }
 
+    // Generate lighter and darker shades
+    let lighter_shade = ColorRGB::from_hsv((base_hue, base_hsv.1, base_hsv.2 * 1.2));
+    let darker_shade = ColorRGB::from_hsv((base_hue, base_hsv.1, base_hsv.2 * 0.8));
+
+    palette.push(lighter_shade);
+    palette.push(darker_shade);
+
+
     Colors {
-        background: palette[0].clone(),
-        color_a: palette[1].clone(),
-        color_b: palette[2].clone(),
-        color_c: palette[3].clone(),
-        highlight: palette[4].clone(),
+        background: palette[4].clone(),
+        color_a: palette[0].clone(),
+        color_b: palette[3].clone(),
+        color_c: palette[1].clone(),
+        highlight: palette[2].clone(),
     }
 }
 
