@@ -33,6 +33,11 @@
       "<m>": "SwitchMarker", // Switches the marker type between Bar, Block, Braille, Dot and HalfBlock (default Braille)
       "<n>": "ToggleSpin", // spins the rectangle if turned on 
 
+      "<Shift-w>": "ColorUp", // Switches the selected color with the one above 
+      "<Shift-s>": "ColorDown", // Switches the selected color with the one below
+
+      "<x>": "Palette", // Views the Palette selector
+
     },
   }
 }

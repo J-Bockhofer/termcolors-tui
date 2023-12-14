@@ -23,7 +23,7 @@ use super::{Component, Frame};
 use crate::{
   action::Action,
   config::{Config, KeyBindings},
-  colors::{Colors, ColorRGB, get_contrast},
+  colors::{Colors, ColorRGB, get_contrast, generators},
 };
 
 use std::sync::OnceLock;
@@ -66,6 +66,7 @@ pub enum DisplayMode {
   InputPrompt,
   Shades,
   HSV,
+  Palette,
 }
 
 #[derive(Default)]
@@ -286,10 +287,95 @@ impl Home {
   }
 
   pub fn popup_palette(&mut self)  -> impl Widget + '_ {
+    let color = self.get_color_by_mode();
+    let colors_mono = generators::monochromatic::generate_monochromatic(color.clone());
+    let colors_analog = generators::analogous::generate_analogous(color.clone());
+    let colors_comp = generators::complementary::generate_complementary(color.clone(), 5);
+    let colors_spl_comp = generators::split_complementary::generate_split_complementary(color.clone());
+    let colors_tri = generators::triadic::generate_triadic(color.clone());
+    let colors_tet = generators::tetradic::generate_tetradic(color.clone());
+
     // Palette should be pickable either as a random palette or based on selected color
     // https://www.thecolorapi.com/docs
+    let lines = vec![
+      Line::from(vec![  Span::styled(" Mon ", Style::new().fg(self.colors.background.flip_rgb())),
+                        Span::styled("     ", Style::new()),
+                        Span::styled(" Ana ", Style::new().fg(self.colors.background.flip_rgb())),
+                        Span::styled("     ", Style::new()),
+                        Span::styled(" Com ", Style::new().fg(self.colors.background.flip_rgb())),
+                        Span::styled("     ", Style::new()),
+                        Span::styled(" Spl ", Style::new().fg(self.colors.background.flip_rgb())),
+                        Span::styled("     ", Style::new()),
+                        Span::styled(" Tri ", Style::new().fg(self.colors.background.flip_rgb())),
+                        Span::styled("     ", Style::new()),
+                        Span::styled(" Tet ", Style::new().fg(self.colors.background.flip_rgb())),
+      ]),
 
-    Paragraph::default()
+
+      Line::from(vec![  Span::styled("     ", Style::new().bg(colors_mono.background.color)),
+                        Span::styled("     ", Style::new()),
+                        Span::styled("     ", Style::new().bg(colors_analog.background.color)),
+                        Span::styled("     ", Style::new()),
+                        Span::styled("     ", Style::new().bg(colors_comp.background.color)),
+                        Span::styled("     ", Style::new()),
+                        Span::styled("     ", Style::new().bg(colors_spl_comp.background.color)),
+                        Span::styled("     ", Style::new()),
+                        Span::styled("     ", Style::new().bg(colors_tri.background.color)),
+                        Span::styled("     ", Style::new()),
+                        Span::styled("     ", Style::new().bg(colors_tet.background.color)),
+      ]),
+      Line::from(vec![  Span::styled("     ", Style::new().bg(colors_mono.color_a.color)),
+                        Span::styled("     ", Style::new()),
+                        Span::styled("     ", Style::new().bg(colors_analog.color_a.color)),
+                        Span::styled("     ", Style::new()),
+                        Span::styled("     ", Style::new().bg(colors_comp.color_a.color)),
+                        Span::styled("     ", Style::new()),
+                        Span::styled("     ", Style::new().bg(colors_spl_comp.color_a.color)),
+                        Span::styled("     ", Style::new()),
+                        Span::styled("     ", Style::new().bg(colors_tri.color_a.color)),
+                        Span::styled("     ", Style::new()),
+                        Span::styled("     ", Style::new().bg(colors_tet.color_a.color)),
+      ]),
+      Line::from(vec![  Span::styled("     ", Style::new().bg(colors_mono.color_b.color)),
+                        Span::styled("     ", Style::new()),
+                        Span::styled("     ", Style::new().bg(colors_analog.color_b.color)),
+                        Span::styled("     ", Style::new()),
+                        Span::styled("     ", Style::new().bg(colors_comp.color_b.color)),
+                        Span::styled("     ", Style::new()),
+                        Span::styled("     ", Style::new().bg(colors_spl_comp.color_b.color)),
+                        Span::styled("     ", Style::new()),
+                        Span::styled("     ", Style::new().bg(colors_tri.color_b.color)),
+                        Span::styled("     ", Style::new()),
+                        Span::styled("     ", Style::new().bg(colors_tet.color_b.color)),
+      ]),
+      Line::from(vec![  Span::styled("     ", Style::new().bg(colors_mono.color_c.color)),
+                        Span::styled("     ", Style::new()),
+                        Span::styled("     ", Style::new().bg(colors_analog.color_c.color)),
+                        Span::styled("     ", Style::new()),
+                        Span::styled("     ", Style::new().bg(colors_comp.color_c.color)),
+                        Span::styled("     ", Style::new()),
+                        Span::styled("     ", Style::new().bg(colors_spl_comp.color_c.color)),
+                        Span::styled("     ", Style::new()),
+                        Span::styled("     ", Style::new().bg(colors_tri.color_c.color)),
+                        Span::styled("     ", Style::new()),
+                        Span::styled("     ", Style::new().bg(colors_tet.color_c.color)),
+      ]),
+      Line::from(vec![  Span::styled("     ", Style::new().bg(colors_mono.highlight.color)),
+                        Span::styled("     ", Style::new()),
+                        Span::styled("     ", Style::new().bg(colors_analog.highlight.color)),
+                        Span::styled("     ", Style::new()),
+                        Span::styled("     ", Style::new().bg(colors_comp.highlight.color)),
+                        Span::styled("     ", Style::new()),
+                        Span::styled("     ", Style::new().bg(colors_spl_comp.highlight.color)),
+                        Span::styled("     ", Style::new()),
+                        Span::styled("     ", Style::new().bg(colors_tri.highlight.color)),
+                        Span::styled("     ", Style::new()),
+                        Span::styled("     ", Style::new().bg(colors_tet.highlight.color)),
+      ]),
+    ];
+
+    let titlestr = " Palettes ";
+    Paragraph::new(lines).bg(self.colors.background.color).block(Block::default().title(titlestr).title_alignment(Alignment::Center).borders(Borders::ALL).border_style(Style::new().fg(self.colors.background.flip_rgb())))
   }
 
   pub fn popup_hsv(&mut self, f: &mut Frame<'_>, area: Rect) {
@@ -469,6 +555,7 @@ impl Home {
           DisplayMode::InputPrompt => {self.submit_input();},
           DisplayMode::HSV => {self.submit_hsv();},
           DisplayMode::Shades => {self.submit_shade();},
+          DisplayMode::Palette => {},
     }
   }
   
@@ -593,6 +680,70 @@ impl Home {
 
   }
 
+  pub fn color_up_by_selection(&mut self) {
+    let mut colors = self.colors.clone();
+    match self.input_selector {
+      InputSelector::Background => {
+        colors.highlight = self.colors.background.clone(); 
+        colors.background = self.colors.highlight.clone(); 
+        self.input_selector = InputSelector::Highlight;
+      },
+      InputSelector::A => {
+        colors.background = self.colors.color_a.clone(); 
+        colors.color_a = self.colors.background.clone(); 
+        self.input_selector = InputSelector::Background;
+      },
+      InputSelector::B => {
+        colors.color_a = self.colors.color_b.clone(); 
+        colors.color_b = self.colors.color_a.clone(); 
+        self.input_selector = InputSelector::A;        
+      },
+      InputSelector::C => {
+        colors.color_b = self.colors.color_c.clone(); 
+        colors.color_c = self.colors.color_b.clone(); 
+        self.input_selector = InputSelector::B;         
+      },
+      InputSelector::Highlight => {
+        colors.color_c = self.colors.highlight.clone(); 
+        colors.highlight = self.colors.color_c.clone(); 
+        self.input_selector = InputSelector::C;
+      },
+    }
+    self.change_color(colors);
+  }
+
+  pub fn color_down_by_selection(&mut self) {
+    let mut colors = self.colors.clone();
+    match self.input_selector {
+      InputSelector::Background => {
+        colors.color_a = self.colors.background.clone(); 
+        colors.background = self.colors.color_a.clone(); 
+        self.input_selector = InputSelector::A;
+      },
+      InputSelector::A => {
+        colors.color_b = self.colors.color_a.clone(); 
+        colors.color_a = self.colors.color_b.clone(); 
+        self.input_selector = InputSelector::B;
+      },
+      InputSelector::B => {
+        colors.color_c = self.colors.color_b.clone(); 
+        colors.color_b = self.colors.color_c.clone(); 
+        self.input_selector = InputSelector::C;        
+      },
+      InputSelector::C => {
+        colors.highlight = self.colors.color_c.clone(); 
+        colors.color_c = self.colors.highlight.clone(); 
+        self.input_selector = InputSelector::Highlight;         
+      },
+      InputSelector::Highlight => {
+        colors.background = self.colors.highlight.clone(); 
+        colors.highlight = self.colors.background.clone(); 
+        self.input_selector = InputSelector::Background;
+      },
+    }
+    self.change_color(colors);
+  }
+
 }
 
 impl Component for Home{
@@ -704,6 +855,11 @@ impl Component for Home{
       Action::HSVIncrease => {self.hsv_increase_by_mode();},
       Action::HSVDecrease => {self.hsv_decrease_by_mode();},
 
+      Action::ColorUp => {self.color_up_by_selection();},
+      Action::ColorDown => {self.color_down_by_selection();},
+
+      Action::TogglePalette => {if self.display_mode != DisplayMode::Palette {self.display_mode = DisplayMode::Palette; self.hsv_color = self.get_color_by_mode();} else {self.display_mode = DisplayMode::Normal};}
+
       _ => {}, // pass the remaining functions here to match mode before proceeding further
     }
     Ok(None)
@@ -807,6 +963,10 @@ impl Component for Home{
         f.render_widget(Clear, popuplayout[1]);
         self.popup_hsv(f, popuplayout[1]);
       },
+      DisplayMode::Palette => {
+        f.render_widget(Clear, popuplayout[1]);
+        f.render_widget(self.popup_palette(), popuplayout[1]);
+      }
     };
 
     Ok(())

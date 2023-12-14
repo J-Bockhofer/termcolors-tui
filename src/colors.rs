@@ -2,6 +2,10 @@
 use ratatui::prelude::Color;
 use std::{str::FromStr, fmt::Error};
 
+pub mod palettes;
+
+pub mod generators;
+
 
 #[derive(Default, Clone)]
 pub struct Colors {
@@ -85,6 +89,14 @@ impl ColorRGB {
     let g = u8::MAX - self.g;
     let b = u8::MAX - self.b;
     Color::Rgb(r, g, b)
+  }
+
+  pub fn with_flip_rgb(&self) -> Self {
+    let r = u8::MAX - self.r;
+    let g = u8::MAX - self.g;
+    let b = u8::MAX - self.b; 
+    ColorRGB { color: Color::Rgb(r, g, b), r, g, b }
+
   }
 
 
@@ -182,6 +194,7 @@ impl ColorRGB {
   }
 
 
+
   pub fn with_hue(&self, new_hue: f64) -> Self {
     let (_, s, v) = self.rgb_to_hsv();
     ColorRGB::from_hsv((new_hue, s, v))
@@ -240,6 +253,8 @@ fn normalize_chan(x: u8) -> f32 {
 fn linearize_chan(x:f32) -> f32 {
     x.powf(2.2)
 }
+
+/// returns the colors luminance between 0. and 1.
 pub fn get_luminance(x: &ColorRGB) -> f32 {
     let _r = linearize_chan(normalize_chan(x.r));
     let _g = linearize_chan(normalize_chan(x.g));
@@ -248,7 +263,7 @@ pub fn get_luminance(x: &ColorRGB) -> f32 {
     _r * 0.2126 + _g * 0.7152 + _b * 0.0722
 }
 
-// get the contrast between two colors
+/// get the contrast between two colors
 pub fn get_contrast(x: &ColorRGB, y: &ColorRGB) -> f32 {
     let lx = get_luminance(x);
     let ly = get_luminance(y);

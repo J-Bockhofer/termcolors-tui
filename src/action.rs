@@ -43,6 +43,11 @@ pub enum Action {
   HSVNext,
   HSVIncrease,
   HSVDecrease,
+
+  ColorUp,
+  ColorDown,
+
+  TogglePalette,
 }
 
 impl<'de> Deserialize<'de> for Action {
@@ -91,6 +96,9 @@ impl<'de> Deserialize<'de> for Action {
           "HSVNext" => Ok(Action::HSVNext),
           "HSVDecrease" => Ok(Action::HSVDecrease),
           "HSVIncrease" => Ok(Action::HSVIncrease),
+          "ColorUp" => Ok(Action::ColorUp),
+          "ColorDown" => Ok(Action::ColorDown),
+          "Palette" => Ok(Action::TogglePalette),
           data if data.starts_with("Error(") => {
             let error_msg = data.trim_start_matches("Error(").trim_end_matches(")");
             Ok(Action::Error(error_msg.to_string()))
